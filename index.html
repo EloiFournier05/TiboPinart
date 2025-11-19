@@ -310,12 +310,17 @@
       font-size: 0.8rem;
       margin-top: 4px;
     }
+    /* Contenu principal caché au début */
+    #main-content {
+      display: none;
+    }
 
     @media (max-width: 360px) {
       .player-maillots {
         flex-wrap: wrap;
       }
     }
+
 	  @media (max-width: 600px) {
     #cover-screen {
     	height: 100vh !important;
@@ -373,7 +378,7 @@
     box-shadow:0 0 12px rgba(0,0,0,0.5);
   ">Commencer le Tour</button>
 </div>
-
+<div id="main-content">
   <div class="app">
     <header class="header">
       <div class="header-top">
@@ -911,9 +916,6 @@ document.getElementById("btn-incident").addEventListener("click", () => {
 
   renderIncidentInterface();
 });
-
-
-
     const elTimer = document.getElementById("timer");
     const elNextEvent = document.getElementById("next-event");
     const elPlayersCard = document.getElementById("players-card");
@@ -953,6 +955,7 @@ function playSound(type) {
 const elCoverScreen  = document.getElementById("cover-screen");
 const elCoverStart   = document.getElementById("btn-cover-start");
 const elProfilRadios = document.querySelectorAll('input[name="profil-etape"]');
+const elMainContent = document.getElementById("main-content");
 
 console.log("INIT COVER", elCoverScreen, elCoverStart);
 
@@ -980,7 +983,9 @@ if (elCoverScreen && elCoverStart) {
 
     // 4) Mettre à jour "Prochain événement"
     updateNextEventLabel();
-
+	if (elMainContent) {
+    elMainContent.style.display = "block";
+  	}
     // Debug
     console.log("Profil:", state.difficulte, "Durée:", state.dureeMinutes, "min");
     console.log("Occurrences:", occ);
@@ -1762,8 +1767,10 @@ function tickTimer() {
   <audio id="snd-cote"      src="snd/cote.mp3"      preload="auto"></audio>
   <audio id="snd-echappee"  src="snd/echappee.mp3"  preload="auto"></audio>
   <audio id="snd-incident"  src="snd/incident.mp3"  preload="auto"></audio>
+	</div>
 </body>
 </html>
+
 
 
 
