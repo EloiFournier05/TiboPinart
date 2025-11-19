@@ -316,6 +316,14 @@
         flex-wrap: wrap;
       }
     }
+	  @media (max-width: 600px) {
+    #cover-screen {
+        background-size: contain !important;
+        background-position: top center !important;
+        background-repeat: no-repeat !important;
+        background-color: #000; /* pour remplir derrière */
+    }
+}
   </style>
 </head>
 <body>
@@ -1754,4 +1762,5 @@ function tickTimer() {
   <audio id="snd-incident"  src="snd/incident.mp3"  preload="auto"></audio>
 </body>
 </html>
+
 
