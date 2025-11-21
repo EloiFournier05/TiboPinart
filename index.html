@@ -241,6 +241,11 @@
       padding: 16px 14px 18px;
       width: 100%;
       max-width: 420px;
+
+      /* POUR UN BON AFFICHAGE SUR ORDI */
+      max-height: 90vh;      /* la modale ne dépasse pas la fenêtre */
+      overflow-y: auto;      /* si le contenu est plus long, on scrolle dedans */
+      box-sizing: border-box;
     }
 
     .modal h1 {
@@ -397,6 +402,12 @@
       <!-- Lignes joueurs générées par JS -->
     </section>
 
+    <!-- NOUVEAU : carte classement par équipes -->
+    <section class="players-card" id="teams-card" style="display:none; margin-top:8px;">
+      <!-- Remplie par JS -->
+    </section>
+
+
 <div style="text-align:center; margin-bottom:10px;">
   <button id="btn-sprint" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem;">
     ⚡ SPRiNT !
@@ -459,10 +470,57 @@
 
       </div>
 
-      <div class="form-group">
+          <div class="form-group">
         <label class="form-label" for="players-input">Prénoms des joueurs (un par ligne)</label>
-        <textarea id="players-input" class="form-textarea" placeholder="Louis&#10;Eloi&#10;JP&#10;Gabriel"></textarea>
+        <textarea id="players-input" class="form-textarea" placeholder="Louis&#10;Eloi&#10;Gabriel&#10;Loïc"></textarea>
       </div>
+
+ <!-- MODE ÉQUIPES -->
+<div class="form-group" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+  <label class="form-label">Mode équipes (optionnel)</label>
+
+  <!-- Activation -->
+  <label style="font-size:0.85rem; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+    <input type="checkbox" id="teams-enabled" />
+    Activer les équipes
+  </label>
+
+  <!-- Zone de configuration affichée uniquement si la case est cochée -->
+  <div id="teams-setup" style="display:none; margin-top:6px;">
+
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <!-- ÉQUIPE 1 -->
+      <div style="flex:1; border:1px solid var(--border); border-radius:8px; padding:6px;">
+        <div style="font-size:0.8rem; margin-bottom:4px; font-weight:600;">Équipe 1</div>
+        <input id="team1-name" class="form-input" type="text" value="Équipe 1" style="margin-bottom:4px;">
+        <input id="team1-tag" class="form-input" type="text" value="EQ1" maxlength="3" style="margin-bottom:4px; text-transform:uppercase;">
+        <label style="font-size:0.75rem; color:var(--text-muted);">Couleur</label>
+        <input id="team1-color" type="color" value="#FFD600" style="width:100%; margin-top:2px;">
+      </div>
+
+      <!-- ÉQUIPE 2 -->
+      <div style="flex:1; border:1px solid var(--border); border-radius:8px; padding:6px;">
+        <div style="font-size:0.8rem; margin-bottom:4px; font-weight:600;">Équipe 2</div>
+        <input id="team2-name" class="form-input" type="text" value="Équipe 2" style="margin-bottom:4px;">
+        <input id="team2-tag" class="form-input" type="text" value="EQ2" maxlength="3" style="margin-bottom:4px; text-transform:uppercase;">
+        <label style="font-size:0.75rem; color:var(--text-muted);">Couleur</label>
+        <input id="team2-color" type="color" value="#00AEEF" style="width:100%; margin-top:2px;">
+      </div>
+    </div>
+
+    <!-- Assignation joueurs ↔ équipes -->
+    <button type="button" class="btn-secondary" id="btn-refresh-teams-assignment">
+      Mettre à jour la liste des joueurs
+    </button>
+
+    <div id="teams-assignment" style="margin-top:8px; font-size:0.8rem;">
+      <div style="color:var(--text-muted);">
+        Cliquez sur « Mettre à jour la liste des joueurs » pour assigner chaque joueur à une équipe.
+      </div>
+    </div>
+
+  </div>
+</div>
 
       <button class="btn-primary" id="btn-start">Lancer le Tour</button>
       <div class="error-text" id="setup-error"></div>
@@ -470,6 +528,9 @@
       <button class="btn-secondary" id="btn-demo">
         Remplir un exemple
       </button>
+  
+
+
     </div>
   </div>
 
@@ -550,7 +611,10 @@ const incidentsList = [
       difficulte: "Plaine",
 
       // Timeline des événements (remplie au lancement)
-      timelineEvents: []
+      timelineEvents: [],
+
+      // Equipes
+      teams: []
 
     };
 
@@ -578,6 +642,40 @@ const incidentsList = [
     function nowSeconds() {
       return Date.now() / 1000;
     }
+
+    function refreshTeamsAssignmentUI() {
+      if (!elTeamsAssignment) return;
+
+      const rawNames = elPlayersInput.value
+        .split("\n")
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      if (rawNames.length === 0) {
+        elTeamsAssignment.innerHTML =
+          '<div style="color:var(--text-muted);">Ajoutez d\'abord des joueurs dans la liste au-dessus.</div>';
+        return;
+      }
+
+      let html = '<div style="margin-top:4px;">';
+      rawNames.forEach((name, idx) => {
+        const idSelect = `team-assign-${idx}`;
+        html += `
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <span>${name}</span>
+            <select id="${idSelect}" class="form-select" style="max-width:150px;">
+              <option value="">Aucune équipe</option>
+              <option value="1">Équipe 1</option>
+              <option value="2">Équipe 2</option>
+            </select>
+          </div>
+        `;
+      });
+      html += '</div>';
+
+      elTeamsAssignment.innerHTML = html;
+    }
+
 
 function computeOccurrences(dureeMinutes, difficulte) {
   const H = dureeMinutes / 60; // durée en heures
@@ -930,11 +1028,49 @@ document.getElementById("btn-incident").addEventListener("click", () => {
     const elClassementContent = document.getElementById("classement-content");
     const elBtnClassementClose = document.getElementById("btn-classement-close");
     const elBtnSettings = document.getElementById("btn-settings");
+    const elTeamsCard   = document.getElementById("teams-card");   // <--- AJOUT
+
+    // Équipes - éléments setup
+    const elTeamsEnabled    = document.getElementById("teams-enabled");
+    const elTeam1Name       = document.getElementById("team1-name");
+    const elTeam1Tag        = document.getElementById("team1-tag");
+    const elTeam1Color      = document.getElementById("team1-color");
+    const elTeam2Name       = document.getElementById("team2-name");
+    const elTeam2Tag        = document.getElementById("team2-tag");
+    const elTeam2Color      = document.getElementById("team2-color");
+    const elTeamsAssignment = document.getElementById("teams-assignment");
+    const elBtnRefreshTeams = document.getElementById("btn-refresh-teams");
+const elTeamsSetup       = document.getElementById("teams-setup");
+
+
+
+
 // SONS
 const sndSprint   = document.getElementById("snd-sprint");
 const sndCote     = document.getElementById("snd-cote");
 const sndEchappee = document.getElementById("snd-echappee");
 const sndIncident = document.getElementById("snd-incident");
+
+// Afficher / cacher la zone équipes
+if (elTeamsEnabled) {
+  elTeamsEnabled.addEventListener("change", () => {
+    if (elTeamsEnabled.checked) {
+      elTeamsSetup.style.display = "block";
+      refreshTeamsAssignmentUI();
+    } else {
+      elTeamsSetup.style.display = "none";
+      elTeamsAssignment.innerHTML = "";
+    }
+  });
+}
+
+// Générer l’UI des joueurs
+if (elBtnRefreshTeams) {
+  elBtnRefreshTeams.addEventListener("click", () => {
+    refreshTeamsAssignmentUI();
+  });
+}
+
 
 function playSound(type) {
   let audio = null;
@@ -1001,13 +1137,12 @@ if (elCoverScreen && elCoverStart) {
   console.warn("cover-screen ou btn-cover-start introuvable");
 }
 
-
-
-
-
     elBtnDemo.addEventListener("click", () => {
       elPlayersInput.value = "Louis\nEloi\nGabriel\nLoïc\nMax";
       elSetupError.textContent = "";
+      if (elTeamsEnabled && elTeamsEnabled.checked) {
+        refreshTeamsAssignmentUI();
+      }
     });
 
     elBtnStart.addEventListener("click", () => {
@@ -1016,6 +1151,25 @@ if (elCoverScreen && elCoverStart) {
         .split("\n")
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
+      // Lecture du mode équipes
+      const teamsEnabled = elTeamsEnabled && elTeamsEnabled.checked;
+      state.teams = [];
+
+      if (teamsEnabled) {
+        const name1  = (elTeam1Name.value || "").trim()  || "Équipe 1";
+        const tag1   = ((elTeam1Tag.value || "").trim()  || "EQ1").toUpperCase();
+        const color1 = elTeam1Color.value || "#FFD600";
+
+        const name2  = (elTeam2Name.value || "").trim()  || "Équipe 2";
+        const tag2   = ((elTeam2Tag.value || "").trim()  || "EQ2").toUpperCase();
+        const color2 = elTeam2Color.value || "#00AEEF";
+
+        state.teams = [
+          { id: 1, name: name1, tag: tag1, color: color1 },
+          { id: 2, name: name2, tag: tag2, color: color2 }
+        ];
+      }
+
 
     elBtnSettings.addEventListener("click", () => {
       ouvrirClassements();
@@ -1024,6 +1178,20 @@ if (elCoverScreen && elCoverStart) {
     elBtnClassementClose.addEventListener("click", () => {
       elClassementModal.style.display = "none";
     });
+
+if (elBtnRefreshTeams) {
+  elBtnRefreshTeams.addEventListener("click", () => {
+    if (!elTeamsAssignment) return;
+
+    // Si le mode équipes n'est pas coché, on l'active automatiquement
+    if (elTeamsEnabled && !elTeamsEnabled.checked) {
+      elTeamsEnabled.checked = true;
+    }
+
+    // Génère l’UI d’affectation équipes ↔ joueurs
+    refreshTeamsAssignmentUI();
+  });
+}
 
 
 
@@ -1036,23 +1204,39 @@ if (elCoverScreen && elCoverStart) {
         return;
       }
 
-      state.joueurs = rawNames.map((nom, idx) => ({
-    id: idx + 1,
-    nom,
-    tempsCumulé: 0,
-    pointsVert: 0,
-    pointsPois: 0,
-    pointsBlanc: 0,
+      state.joueurs = rawNames.map((nom, idx) => {
+        let equipeId = null;
 
-    incidentActif: false,
-    incidentLabel: null,
+        if (teamsEnabled && state.teams.length > 0) {
+          const select = document.getElementById(`team-assign-${idx}`);
+          if (select && select.value) {
+            const val = parseInt(select.value, 10);
+            if (!isNaN(val)) {
+              equipeId = val; // 1 ou 2
+            }
+          }
+        }
 
-    // Durée des incidents
-    incidentExpirePinte: null,
-    incidentExpireTimestamp: null,
+        return {
+          id: idx + 1,
+          nom,
+          tempsCumulé: 0,
+          pointsVert: 0,
+          pointsPois: 0,
+          pointsBlanc: 0,
 
-    aFiniCettePinte: false
-}));
+          incidentActif: false,
+          incidentLabel: null,
+
+          incidentExpirePinte: null,
+          incidentExpireTimestamp: null,
+
+          aFiniCettePinte: false,
+
+          equipeId: equipeId
+        };
+      });
+
 
 
       state.dureeMinutes = minutes;
@@ -1132,7 +1316,27 @@ if (elCoverScreen && elCoverStart) {
         name.textContent = j.nom;
         left.appendChild(name);
 
+        // Badge d'équipe si défini
+        if (j.equipeId && state.teams && state.teams.length > 0) {
+          const team = state.teams.find(t => t.id === j.equipeId);
+          if (team) {
+            const teamBadge = document.createElement("span");
+            teamBadge.style.marginLeft = "6px";
+            teamBadge.style.padding = "2px 6px";
+            teamBadge.style.borderRadius = "999px";
+            teamBadge.style.fontSize = "0.7rem";
+            teamBadge.style.fontWeight = "600";
+            teamBadge.style.backgroundColor = team.color || "#444";
+            teamBadge.style.color = "#000";
+            teamBadge.style.textTransform = "uppercase";
+            teamBadge.textContent = team.tag || "EQ";
+
+            left.appendChild(teamBadge);
+          }
+        }
+
         topLine.appendChild(left);
+
 
         if (j.incidentActif && j.incidentLabel) {
           const inc = document.createElement("div");
@@ -1217,7 +1421,117 @@ if (elCoverScreen && elCoverStart) {
 
         elPlayersCard.appendChild(row);
       });
+      renderTeams();   // <--- AJOUT
+
     }
+
+    // ======== CLASSEMENT PAR ÉQUIPES ========
+    function renderTeams() {
+      if (!elTeamsCard) return;
+
+      // Si aucun mode équipe ou aucune équipe configurée
+      if (!state.teams || state.teams.length === 0) {
+        elTeamsCard.style.display = "none";
+        elTeamsCard.innerHTML = "";
+        return;
+      }
+
+      // Construire les stats par équipe
+      const statsMap = new Map();
+      state.teams.forEach(t => {
+        statsMap.set(t.id, {
+          team: t,
+          totalTemps: 0,
+          totalVerts: 0,
+          totalPois: 0,
+          totalBlancs: 0,
+          nbJoueurs: 0
+        });
+      });
+
+      // Aggrégation des joueurs dans leur équipe
+      state.joueurs.forEach(j => {
+        if (!j.equipeId || !statsMap.has(j.equipeId)) return;
+        const s = statsMap.get(j.equipeId);
+        s.totalTemps  += j.tempsCumulé;
+        s.totalVerts  += j.pointsVert;
+        s.totalPois   += j.pointsPois;
+        s.totalBlancs += j.pointsBlanc;
+        s.nbJoueurs   += 1;
+      });
+
+      // Filtrer les équipes qui n'ont aucun joueur
+      let stats = Array.from(statsMap.values()).filter(s => s.nbJoueurs > 0);
+      if (stats.length === 0) {
+        elTeamsCard.style.display = "none";
+        elTeamsCard.innerHTML = "";
+        return;
+      }
+
+      // Classement sur la base du temps moyen par joueur
+      stats.forEach(s => {
+        s.avgTemps = s.totalTemps / s.nbJoueurs;
+      });
+      stats.sort((a, b) => a.avgTemps - b.avgTemps);
+
+      const bestAvg = stats[0].avgTemps;
+
+      let html = "";
+
+      stats.forEach((s, idx) => {
+        const delta = s.avgTemps - bestAvg;
+        const deltaStr = idx === 0 ? "leader" : formatDeltaSeconds(delta);
+
+        html += `
+          <div class="player-row">
+            <div class="player-top-line">
+              <div style="display:flex; align-items:center;">
+                <div class="player-rank">${idx + 1}.</div>
+                <div class="player-name">
+                  <span style="
+                    display:inline-flex;
+                    align-items:center;
+                    padding:2px 8px;
+                    border-radius:999px;
+                    font-size:0.75rem;
+                    font-weight:700;
+                    margin-right:6px;
+                    background:${s.team.color || "#444"};
+                    color:#000;
+                    text-transform:uppercase;
+                  ">
+                    ${s.team.tag || "EQ"}
+                  </span>
+                  ${s.team.name || "Équipe"}
+                </div>
+              </div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">
+                ${deltaStr}
+              </div>
+            </div>
+
+            <div class="player-maillots">
+              <div class="badge">
+                <span class="badge-green-dot"></span>
+                <span>${s.totalVerts} pts</span>
+              </div>
+              <div class="badge">
+                <span class="badge-red-dot"></span>
+                <span>${s.totalPois} pts</span>
+              </div>
+              <div class="badge">
+                <span class="badge-white-dot"></span>
+                <span>${s.totalBlancs} pts</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      elTeamsCard.innerHTML = html;
+      elTeamsCard.style.display = "block";
+    }
+
 
     // ======== GESTION FIN DE PINTE (MAILLOT JAUNE) ========
 
@@ -1770,7 +2084,3 @@ function tickTimer() {
 	</div>
 </body>
 </html>
-
-
-
-
