@@ -618,6 +618,47 @@ const incidentsList = [
 
     };
 
+// ======== SAUVEGARDE LOCALSTORAGE ========
+const SAVE_KEY = "tiboPinartSaveV1";
+
+function buildSavePayload() {
+  return {
+    version: 1,
+    savedAt: Date.now(),
+    state: {
+      joueurs: state.joueurs,
+      dureeMinutes: state.dureeMinutes,
+      tourFinTimestamp: state.tourFinTimestamp,
+      tourStartTimestamp: state.tourStartTimestamp,
+      pinteEnCours: state.pinteEnCours,
+      finPinteOrdre: state.finPinteOrdre,
+      numeroPinte: state.numeroPinte,
+      difficulte: state.difficulte,
+      timelineEvents: state.timelineEvents,
+      teams: state.teams
+    }
+  };
+}
+
+function saveGame() {
+  try {
+    const payload = buildSavePayload();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    // console.log("Partie sauvegardée", payload);
+  } catch (e) {
+    console.error("Erreur de sauvegarde Tibo Pinart :", e);
+  }
+}
+
+function clearSavedGame() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) {
+    console.error("Erreur suppression sauvegarde :", e);
+  }
+}
+
+
     // ======== UTILITAIRES ========
 
     function formatTimeHMS(totalSeconds) {
@@ -1043,6 +1084,19 @@ document.getElementById("btn-incident").addEventListener("click", () => {
 const elTeamsSetup       = document.getElementById("teams-setup");
 
 
+// Bouton ⚙ = ouvre la modale de classements
+if (elBtnSettings) {
+  elBtnSettings.addEventListener("click", () => {
+    ouvrirClassements();
+  });
+}
+
+// Bouton "Fermer" de la modale de classements
+if (elBtnClassementClose) {
+  elBtnClassementClose.addEventListener("click", () => {
+    elClassementModal.style.display = "none";
+  });
+}
 
 
 // SONS
@@ -1086,14 +1140,81 @@ function playSound(type) {
   }
 }
 
-
-
 const elCoverScreen  = document.getElementById("cover-screen");
 const elCoverStart   = document.getElementById("btn-cover-start");
 const elProfilRadios = document.querySelectorAll('input[name="profil-etape"]');
 const elMainContent = document.getElementById("main-content");
 
 console.log("INIT COVER", elCoverScreen, elCoverStart);
+
+function tryRestoreGameOnLoad() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(SAVE_KEY);
+  } catch (e) {
+    console.error("Impossible de lire la sauvegarde :", e);
+    return;
+  }
+
+  if (!raw) return;
+
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch (e) {
+    console.error("Sauvegarde corrompue :", e);
+    return;
+  }
+
+  if (!payload || !payload.state) return;
+
+  const confirmResume = window.confirm(
+    "Une partie Tibo Pinart sauvegardée a été trouvée.\n\nVoulez-vous la reprendre ?"
+  );
+  if (!confirmResume) return;
+
+  const s = payload.state;
+
+  // On recopie l'état
+  state.joueurs           = s.joueurs || [];
+  state.dureeMinutes      = s.dureeMinutes || 180;
+  state.tourFinTimestamp  = s.tourFinTimestamp;
+  state.tourStartTimestamp= s.tourStartTimestamp;
+  state.pinteEnCours      = s.pinteEnCours;
+  state.finPinteOrdre     = s.finPinteOrdre || [];
+  state.numeroPinte       = s.numeroPinte || 1;
+  state.difficulte        = s.difficulte || "Plaine";
+  state.timelineEvents    = s.timelineEvents || [];
+  state.teams             = s.teams || [];
+
+  // On masque la jaquette et le setup, on affiche le jeu
+  if (elCoverScreen) elCoverScreen.style.display = "none";
+  if (elSetupModal)  elSetupModal.style.display  = "none";
+  if (elMainContent) elMainContent.style.display = "block";
+
+  // On relance le timer si le Tour n'est pas déjà fini
+  if (state.tourFinTimestamp) {
+    const remaining = Math.floor(state.tourFinTimestamp - nowSeconds());
+    if (remaining > 0) {
+      elTimer.textContent = formatTimeHMS(remaining);
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.timerInterval = setInterval(tickTimer, 1000);
+    } else {
+      elTimer.textContent = "00:00:00";
+      endTour();
+    }
+  }
+
+  // On rerend l’UI
+  renderPlayers();
+  renderTeams();
+  updateNextEventLabel();
+  setEventZone(
+    "Partie reprise",
+    "Le Tour a repris là où il avait été sauvegardé."
+  );
+}
+
 
 if (elCoverScreen && elCoverStart) {
   // Afficher la jaquette au chargement
@@ -1171,13 +1292,6 @@ if (elCoverScreen && elCoverStart) {
       }
 
 
-    elBtnSettings.addEventListener("click", () => {
-      ouvrirClassements();
-    });
-
-    elBtnClassementClose.addEventListener("click", () => {
-      elClassementModal.style.display = "none";
-    });
 
 if (elBtnRefreshTeams) {
   elBtnRefreshTeams.addEventListener("click", () => {
@@ -1257,6 +1371,8 @@ if (elBtnRefreshTeams) {
         "Tour lancé",
         "La première pinte est en cours. Appuie sur « Fini » quand un joueur termine sa pinte pour mettre à jour le Maillot Jaune."
       );
+      saveGame();
+
     });
 
     function tickTimer() {
@@ -1607,6 +1723,8 @@ cleanExpiredIncidents();
       renderPlayers();
 
       setEventZone("Étape terminée", resumeEtape.trim());
+      saveGame();
+
     }
 
     function setEventZone(title, body) {
@@ -1677,6 +1795,8 @@ function validerSprint() {
 
   renderPlayers();
   setEventZone("Sprint terminé", result.trim());
+  saveGame();
+
 }
 
 function renderCoteInterface() {
@@ -1775,7 +1895,9 @@ function validerCote() {
       "Aucun événement en cours",
       "Quand une pinte est terminée, appuie sur « Fini »."
     );
+    saveGame();
   });
+
 }
 
 function renderEchappeeInterface() {
@@ -1852,7 +1974,9 @@ function finalizeEchappee() {
       "Aucun événement en cours",
       "Quand une pinte est terminée, appuie sur « Fini »."
     );
+    saveGame();
   });
+
 }
 
 function renderIncidentInterface() {
@@ -1923,8 +2047,10 @@ function renderIncidentInterface() {
       "Aucun événement en cours",
       "Quand une pinte est terminée, appuie sur « Fini »."
     );
+    saveGame();
   });
 }
+
 
 // Nettoyage des incidents expirés (par pinte ou par délai)
 function cleanExpiredIncidents() {
@@ -2074,6 +2200,10 @@ function tickTimer() {
   updateNextEventLabel();
   checkTimelineEvents();
 }
+// DOMContentLoaded = quand le HTML est chargé et le DOM prêt
+document.addEventListener("DOMContentLoaded", () => {
+  tryRestoreGameOnLoad();
+});
 
 </script>
   <!-- SONS -->
