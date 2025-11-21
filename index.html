@@ -1186,6 +1186,13 @@ function tryRestoreGameOnLoad() {
   state.difficulte        = s.difficulte || "Plaine";
   state.timelineEvents    = s.timelineEvents || [];
   state.teams             = s.teams || [];
+  // Normalisation des champs SAGAN pour les anciennes sauvegardes
+  state.joueurs.forEach(j => {
+    if (typeof j.isSagan === "undefined") j.isSagan = false;
+    if (typeof j.saganExpireTimestamp === "undefined") j.saganExpireTimestamp = null;
+    if (typeof j.sprintsWonConsecutifs === "undefined") j.sprintsWonConsecutifs = 0;
+  });
+
 
   // On masque la jaquette et le setup, on affiche le jeu
   if (elCoverScreen) elCoverScreen.style.display = "none";
@@ -1265,6 +1272,8 @@ if (elCoverScreen && elCoverStart) {
         refreshTeamsAssignmentUI();
       }
     });
+
+
 
     elBtnStart.addEventListener("click", () => {
       const minutes = parseInt(elDuration.value, 10);
@@ -1347,7 +1356,12 @@ if (elBtnRefreshTeams) {
 
           aFiniCettePinte: false,
 
-          equipeId: equipeId
+          equipeId: equipeId,
+
+          // ---- CHAMPS SAGAN ----
+          isSagan: false,
+          saganExpireTimestamp: null,
+          sprintsWonConsecutifs: 0
         };
       });
 
@@ -1449,6 +1463,22 @@ if (elBtnRefreshTeams) {
 
             left.appendChild(teamBadge);
           }
+        }
+
+        // Badge SAGAN si actif
+        if (j.isSagan) {
+          const saganBadge = document.createElement("span");
+          saganBadge.style.marginLeft = "6px";
+          saganBadge.style.padding = "2px 6px";
+          saganBadge.style.borderRadius = "999px";
+          saganBadge.style.fontSize = "0.7rem";
+          saganBadge.style.fontWeight = "600";
+          saganBadge.style.backgroundColor = "#00c853"; // vert flashy
+          saganBadge.style.color = "#000";
+          saganBadge.style.textTransform = "uppercase";
+          saganBadge.textContent = "SAGAN";
+
+          left.appendChild(saganBadge);
         }
 
         topLine.appendChild(left);
@@ -1777,17 +1807,56 @@ function validerSprint() {
     classements.push({ id: j.id, rank });
   });
 
+  // Tri par rang (1 = meilleur)
   classements.sort((a,b)=>a.rank-b.rank);
 
-  const points = [10,6,4,3,2,1];
+  const points = [10, 6, 4, 3, 2, 1];
   let result = "Résultats du Sprint :\n\n";
+
+  let nouveauSaganNom = null;
 
   classements.forEach((entry, idx) => {
     const joueur = state.joueurs.find(j=>j.id===entry.id);
-    const p = points[idx] || 1;
-    joueur.pointsVert += p;
-    result += `${idx+1}. ${joueur.nom} (+${p} pts)\n`;
+    if (!joueur) return;
+
+    // 1) Gestion des victoires consécutives
+    if (idx === 0) {
+      // Vainqueur du sprint
+      joueur.sprintsWonConsecutifs = (joueur.sprintsWonConsecutifs || 0) + 1;
+
+      // Activation éventuelle du mode SAGAN (2 sprints de suite)
+      if (!joueur.isSagan && joueur.sprintsWonConsecutifs >= 2) {
+        joueur.isSagan = true;
+        joueur.saganExpireTimestamp = nowSeconds() + 3600; // 1h
+        nouveauSaganNom = joueur.nom;
+      }
+    } else {
+      // Tous les autres perdent leur série
+      joueur.sprintsWonConsecutifs = 0;
+    }
+
+    // 2) Points verts
+    const basePoints = points[idx] || 1;
+    let totalPoints = basePoints;
+
+    // Bonus SAGAN : +3 points verts à chaque sprint
+    if (joueur.isSagan) {
+      totalPoints += 3;
+    }
+
+    joueur.pointsVert += totalPoints;
+
+    // 3) Texte de résultat
+    if (joueur.isSagan) {
+      result += `${idx+1}. ${joueur.nom} (+${basePoints} pts +3 pts SAGAN = ${totalPoints} pts)\n`;
+    } else {
+      result += `${idx+1}. ${joueur.nom} (+${totalPoints} pts)\n`;
+    }
   });
+
+  if (nouveauSaganNom) {
+    result += `\n${nouveauSaganNom} passe en mode SAGAN pour 1 heure !`;
+  }
 
   sprintActif = false;
   sprintCooldown = nowSeconds() + 900; // 15 min de cooldown
@@ -1796,7 +1865,6 @@ function validerSprint() {
   renderPlayers();
   setEventZone("Sprint terminé", result.trim());
   saveGame();
-
 }
 
 function renderCoteInterface() {
@@ -1983,10 +2051,21 @@ function renderIncidentInterface() {
   const inc = incidentData;
 
   let target = null;
-  // Choix du joueur si type = player
+
+  // Choix du joueur si type = player, en excluant les SAGAN
   if (inc.type === "player") {
-    const idx = Math.floor(Math.random() * state.joueurs.length);
-    target = state.joueurs[idx];
+    const candidates = state.joueurs.filter(j => !j.isSagan);
+
+    if (candidates.length === 0) {
+      // Personne à cibler -> incident annulé
+      incidentActif = false;
+      incidentData = null;
+      setEventZone("Aucun incident", "Tous les coureurs sont en mode SAGAN, l'incident est annulé.");
+      return;
+    }
+
+    const idx = Math.floor(Math.random() * candidates.length);
+    target = candidates[idx];
   }
 
   let html = `<div class="event-title">⚠️ Incident</div>`;
@@ -1995,7 +2074,7 @@ function renderIncidentInterface() {
     html += `<div class="event-body"><b>${inc.label}</b><br><br>Cible : <b>${target.nom}</b></div>`;
   }
   else if (inc.type === "all") {
-    html += `<div class="event-body"><b>${inc.label}</b><br><br>Tous les joueurs sont concernés.</div>`;
+    html += `<div class="event-body"><b>${inc.label}</b><br><br>Tous les joueurs sont concernés (hors SAGAN).</div>`;
   }
   else {
     html += `<div class="event-body"><b>${inc.label}</b><br><br>Impact gameplay.</div>`;
@@ -2011,20 +2090,22 @@ function renderIncidentInterface() {
 
   document.getElementById("btn-incident-ok").addEventListener("click", () => {
     // Appliquer l'incident au joueur si nécessaire
-    if (inc.type === "player") {
-    target.incidentActif = true;
-    target.incidentLabel = inc.label;
+    if (inc.type === "player" && target && !target.isSagan) {
+      target.incidentActif = true;
+      target.incidentLabel = inc.label;
 
-    if (inc.duration === "1-pinte") {
-      target.incidentExpirePinte = state.numeroPinte; 
+      if (inc.duration === "1-pinte") {
+        target.incidentExpirePinte = state.numeroPinte; 
+      }
+      if (inc.duration === "5-min") {
+        target.incidentExpireTimestamp = nowSeconds() + 300;
+      }
     }
-    if (inc.duration === "5-min") {
-      target.incidentExpireTimestamp = nowSeconds() + 300;
-    }
-}
 
     if (inc.type === "all") {
-    state.joueurs.forEach(j => {
+      state.joueurs.forEach(j => {
+        if (j.isSagan) return; // immunité
+
         j.incidentActif = true;
         j.incidentLabel = inc.label;
 
@@ -2034,9 +2115,8 @@ function renderIncidentInterface() {
         if (inc.duration === "5-min") {
           j.incidentExpireTimestamp = nowSeconds() + 300;
         }
-    });
-}
-
+      });
+    }
 
     renderPlayers();
 
@@ -2050,6 +2130,7 @@ function renderIncidentInterface() {
     saveGame();
   });
 }
+
 
 
 // Nettoyage des incidents expirés (par pinte ou par délai)
@@ -2077,113 +2158,17 @@ function cleanExpiredIncidents() {
   });
 }
 
-// Libellé lisible pour les types d'événements
-function describeEventType(type) {
-  if (type === "SPRINT")   return "Sprint (maillot vert)";
-  if (type === "COTE")     return "Côte (maillot à pois)";
-  if (type === "ECHAPPEE") return "Échappée (maillot blanc)";
-  if (type === "INCIDENT") return "Incident de course";
-  return type;
-}
-
-// Met à jour la ligne "Prochain événement : ..."
-function updateNextEventLabel() {
-  if (!elNextEvent) return;
-
-  if (!state.timelineEvents || state.timelineEvents.length === 0 || !state.tourStartTimestamp) {
-    elNextEvent.textContent = "Prochain événement : aucun";
-    return;
-  }
-
+function checkSaganExpiry() {
   const now = nowSeconds();
-  const elapsed = now - state.tourStartTimestamp;
 
-  const next = state.timelineEvents.find(ev => !ev.fired && ev.timeOffset > elapsed);
-
-  if (!next) {
-    elNextEvent.textContent = "Prochain événement : aucun (fin du Tour)";
-    return;
-  }
-
-  const secondsToGo = Math.max(0, Math.round(next.timeOffset - elapsed));
-  const minutes = Math.floor(secondsToGo / 60);
-  const secs    = secondsToGo % 60;
-
-  const tStr = minutes > 0
-    ? `${minutes} min ${secs.toString().padStart(2,"0")} s`
-    : `${secs} s`;
-
-  elNextEvent.textContent =
-    `Prochain événement : ${describeEventType(next.type)} dans ${tStr}`;
-}
-
-// Marque comme "fired" les événements dont l'heure est passée
-
-function checkTimelineEvents() {
-  if (!state.timelineEvents || state.timelineEvents.length === 0 || !state.tourStartTimestamp) {
-    return;
-  }
-
-  // Si un événement est déjà en cours, on ne déclenche rien de nouveau
-  if (isAnyEventActive()) {
-    return;
-  }
-
-  const now = nowSeconds();
-  const elapsed = now - state.tourStartTimestamp;
-
-  state.timelineEvents.forEach(ev => {
-    if (!ev.fired && ev.timeOffset <= elapsed) {
-      ev.fired = true;
-
-      console.log(
-        "Événement déclenché par la timeline :",
-        ev.type,
-        "à t =",
-        Math.round(ev.timeOffset),
-        "s"
-      );
-
-      if (ev.type === "SPRINT") {
-        if (!sprintActif) {
-          sprintActif = true;
-          sprintLanceur = null;
-          renderSprintInterface();
-          playSound("SPRINT");
-        }
-      }
-      else if (ev.type === "COTE") {
-        if (!coteActive) {
-          coteActive = true;
-          coteCible = Math.floor(20 + Math.random() * 60);
-          renderCoteInterface();
-          playSound("COTE");
-        }
-      }
-      else if (ev.type === "ECHAPPEE") {
-        if (!echappeeActive) {
-          echappeeActive = true;
-          echappeeClics = [];
-          renderEchappeeInterface();
-          playSound("ECHAPPEE");
-
-        }
-      }
-      else if (ev.type === "INCIDENT") {
-        if (!incidentActif) {
-          incidentActif = true;
-          incidentData = incidentsList[Math.floor(Math.random() * incidentsList.length)];
-          renderIncidentInterface();
-	  playSound("INCIDENT");
-        }
-      }
+  state.joueurs.forEach(j => {
+    if (j.isSagan && j.saganExpireTimestamp && now >= j.saganExpireTimestamp) {
+      j.isSagan = false;
+      j.saganExpireTimestamp = null;
+      j.sprintsWonConsecutifs = 0;
     }
   });
-
-  cleanExpiredIncidents();
 }
-
-
 
 // Tick du timer principal
 function tickTimer() {
@@ -2197,9 +2182,13 @@ function tickTimer() {
     elTimer.textContent = formatTimeHMS(remaining);
   }
 
+  // Expiration du mode SAGAN si besoin
+  checkSaganExpiry();
+
   updateNextEventLabel();
   checkTimelineEvents();
 }
+
 // DOMContentLoaded = quand le HTML est chargé et le DOM prêt
 document.addEventListener("DOMContentLoaded", () => {
   tryRestoreGameOnLoad();
