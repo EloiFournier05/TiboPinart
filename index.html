@@ -29,7 +29,6 @@
     }
 
     body {
-
       background: var(--bg);
       color: var(--text);
       padding: 8px;
@@ -50,7 +49,7 @@
       margin-bottom: 8px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .header-top {
@@ -84,6 +83,34 @@
     .next-event {
       font-size: 0.8rem;
       color: var(--text-muted);
+    }
+
+    .room-code {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-soft);
+      font-size: 0.85rem;
+    }
+
+    .room-code span {
+      font-weight: 700;
+      color: var(--yellow);
+      letter-spacing: 0.1em;
+    }
+
+    .btn-copy {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
     }
 
     /* JOUEURS */
@@ -220,6 +247,7 @@
 
     .event-body {
       line-height: 1.3;
+      white-space: pre-line;
     }
 
     /* SETUP MODAL */
@@ -241,10 +269,8 @@
       padding: 16px 14px 18px;
       width: 100%;
       max-width: 420px;
-
-      /* POUR UN BON AFFICHAGE SUR ORDI */
-      max-height: 90vh;      /* la modale ne dépasse pas la fenêtre */
-      overflow-y: auto;      /* si le contenu est plus long, on scrolle dedans */
+      max-height: 90vh;
+      overflow-y: auto;
       box-sizing: border-box;
     }
 
@@ -315,9 +341,66 @@
       font-size: 0.8rem;
       margin-top: 4px;
     }
+
     /* Contenu principal caché au début */
     #main-content {
       display: none;
+    }
+
+    #player-content {
+      display: none;
+    }
+
+    .mode-buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .mode-buttons .btn-primary {
+      width: auto;
+      min-width: 160px;
+      font-size: 1.1rem;
+      padding: 12px 18px;
+    }
+
+    .config-link {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: #f6f6f6;
+      text-decoration: underline;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+    }
+
+    .player-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 16px;
+      margin-top: 20px;
+    }
+
+    .player-finish {
+      width: 100%;
+      border-radius: 16px;
+      padding: 18px 12px;
+      font-size: 1.4rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--yellow), var(--accent));
+      color: #000;
+      border: none;
+      cursor: pointer;
+      margin-top: 14px;
+    }
+
+    .player-status {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
 
     @media (max-width: 360px) {
@@ -326,20 +409,20 @@
       }
     }
 
-	  @media (max-width: 600px) {
-    #cover-screen {
-    	height: 100vh !important;
-    	overflow: hidden !important;
+    @media (max-width: 600px) {
+      #cover-screen {
+        height: 100vh !important;
+        overflow: hidden !important;
         background-size: contain !important;
         background-position: top center !important;
         background-repeat: no-repeat !important;
-        background-color: #000; /* pour remplir derrière */
+        background-color: #000;
+      }
     }
-}
   </style>
 </head>
 <body>
-<!-- ÉCRAN DE COUVERTURE -->
+<!-- ÉCRAN DE COUVERTURE + MODE -->
 <div id="cover-screen" style="
   position:fixed;
   top:0; left:0; width:100%; height:100%;
@@ -366,23 +449,26 @@
 
   <h2 style="
     font-size:1.4rem;
-    margin-bottom:40px;
+    margin-bottom:10px;
     opacity:0.95;
     font-weight:600;
     text-shadow:0 0 10px #000;
   ">Le Tour du Bar</h2>
 
-  <button id="btn-cover-start" class="btn-primary" style="
-    font-size:1.4rem;
-    padding:14px 24px;
-    border-radius:12px;
-    background:#ffd60a;
-    color:#000;
-    border:none;
-    font-weight:700;
-    box-shadow:0 0 12px rgba(0,0,0,0.5);
-  ">Commencer le Tour</button>
+  <div style="font-size:0.9rem; color:#f6f6f6; text-shadow:0 0 10px #000;">
+    Choisis ton mode
+  </div>
+
+  <div class="mode-buttons">
+    <button id="btn-mode-host" class="btn-primary" style="background:#ffd60a;">Mode Host</button>
+    <button id="btn-mode-player" class="btn-primary" style="background:#ffffff; color:#000;">Mode Player</button>
+  </div>
+
+  <button id="btn-config-supabase" class="config-link" type="button">
+    Configurer Supabase
+  </button>
 </div>
+
 <div id="main-content">
   <div class="app">
     <header class="header">
@@ -390,42 +476,45 @@
         <div>
           <div class="timer-label">Temps restant</div>
           <div class="timer-value" id="timer">--:--:--</div>
-       <div id="next-event" class="next-event-text">
-        Prochain événement : chargement…
-       </div>
+          <div id="next-event" class="next-event">Prochain événement : chargement…</div>
         </div>
         <button class="settings-btn" id="btn-settings" title="Menu (non actif pour la V1)">⚙</button>
       </div>
+      <div class="room-code" id="room-code">
+        Code salle : <span id="room-code-value">—</span>
+        <button class="btn-copy" id="btn-copy-room">Copier</button>
+      </div>
+      <div class="next-event" id="supabase-warning" style="display:none;">
+        Supabase non configuré, le mode Player est désactivé.
+      </div>
+      <div class="next-event" id="supabase-status" style="display:none;"></div>
     </header>
 
     <section class="players-card" id="players-card">
       <!-- Lignes joueurs générées par JS -->
     </section>
 
-    <!-- NOUVEAU : carte classement par équipes -->
     <section class="players-card" id="teams-card" style="display:none; margin-top:8px;">
       <!-- Remplie par JS -->
     </section>
 
+    <div style="text-align:center; margin-bottom:10px;">
+      <button id="btn-sprint" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem;">
+        ⚡ SPRiNT !
+      </button>
 
-<div style="text-align:center; margin-bottom:10px;">
-  <button id="btn-sprint" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem;">
-    ⚡ SPRiNT !
-  </button>
+      <button id="btn-cote" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem; background:#7E57C2; margin-left:6px;">
+        ⛰️ Côte
+      </button>
 
-  <button id="btn-cote" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem; background:#7E57C2; margin-left:6px;">
-    ⛰️ Côte
-  </button>
+      <button id="btn-echappee" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem; background:#F5F5F5; color:#000; margin-left:6px;">
+        🚴 Échappée
+      </button>
 
-  <button id="btn-echappee" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem; background:#F5F5F5; color:#000; margin-left:6px;">
-    🚴 Échappée
-  </button>
-
-  <button id="btn-incident" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem; background:#d7263d; margin-left:6px;">
-    ⚠️ Incident
-  </button>
-
-</div>
+      <button id="btn-incident" class="btn-primary" style="width:auto; padding:8px 20px; font-size:1rem; background:#d7263d; margin-left:6px;">
+        ⚠️ Incident
+      </button>
+    </div>
 
     <section class="event-zone" id="event-zone">
       <div class="event-title">Aucun événement en cours</div>
@@ -450,91 +539,75 @@
           <option value="240">4h</option>
           <option value="300">5h</option>
         </select>
-<div style="margin-top:12px;">
-  <span style="font-weight:600;">Profil de l'étape</span>
-  <div style="margin-top:4px; font-size:0.9rem;">
-    <label>
-      <input type="radio" name="profil-etape" value="Ville" checked>
-      Ville (soft)
-    </label><br>
-    <label>
-      <input type="radio" name="profil-etape" value="Plaine">
-      Plaine (medium)
-    </label><br>
-    <label>
-      <input type="radio" name="profil-etape" value="Montagne">
-      Montagne (hard)
-    </label>
-  </div>
-</div>
-
+        <div style="margin-top:12px;">
+          <span style="font-weight:600;">Profil de l'étape</span>
+          <div style="margin-top:4px; font-size:0.9rem;">
+            <label>
+              <input type="radio" name="profil-etape" value="Ville" checked>
+              Ville (soft)
+            </label><br>
+            <label>
+              <input type="radio" name="profil-etape" value="Plaine">
+              Plaine (medium)
+            </label><br>
+            <label>
+              <input type="radio" name="profil-etape" value="Montagne">
+              Montagne (hard)
+            </label>
+          </div>
+        </div>
       </div>
 
-          <div class="form-group">
+      <div class="form-group">
         <label class="form-label" for="players-input">Prénoms des joueurs (un par ligne)</label>
         <textarea id="players-input" class="form-textarea" placeholder="Louis&#10;Eloi&#10;Gabriel&#10;Loïc"></textarea>
       </div>
 
- <!-- MODE ÉQUIPES -->
-<div class="form-group" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
-  <label class="form-label">Mode équipes (optionnel)</label>
+      <div class="form-group" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+        <label class="form-label">Mode équipes (optionnel)</label>
+        <label style="font-size:0.85rem; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <input type="checkbox" id="teams-enabled" />
+          Activer les équipes
+        </label>
 
-  <!-- Activation -->
-  <label style="font-size:0.85rem; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-    <input type="checkbox" id="teams-enabled" />
-    Activer les équipes
-  </label>
+        <div id="teams-setup" style="display:none; margin-top:6px;">
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <div style="flex:1; border:1px solid var(--border); border-radius:8px; padding:6px;">
+              <div style="font-size:0.8rem; margin-bottom:4px; font-weight:600;">Équipe 1</div>
+              <input id="team1-name" class="form-input" type="text" value="Équipe 1" style="margin-bottom:4px;">
+              <input id="team1-tag" class="form-input" type="text" value="EQ1" maxlength="3" style="margin-bottom:4px; text-transform:uppercase;">
+              <label style="font-size:0.75rem; color:var(--text-muted);">Couleur</label>
+              <input id="team1-color" type="color" value="#FFD600" style="width:100%; margin-top:2px;">
+            </div>
 
-  <!-- Zone de configuration affichée uniquement si la case est cochée -->
-  <div id="teams-setup" style="display:none; margin-top:6px;">
+            <div style="flex:1; border:1px solid var(--border); border-radius:8px; padding:6px;">
+              <div style="font-size:0.8rem; margin-bottom:4px; font-weight:600;">Équipe 2</div>
+              <input id="team2-name" class="form-input" type="text" value="Équipe 2" style="margin-bottom:4px;">
+              <input id="team2-tag" class="form-input" type="text" value="EQ2" maxlength="3" style="margin-bottom:4px; text-transform:uppercase;">
+              <label style="font-size:0.75rem; color:var(--text-muted);">Couleur</label>
+              <input id="team2-color" type="color" value="#00AEEF" style="width:100%; margin-top:2px;">
+            </div>
+          </div>
 
-    <div style="display:flex; gap:8px; margin-bottom:8px;">
-      <!-- ÉQUIPE 1 -->
-      <div style="flex:1; border:1px solid var(--border); border-radius:8px; padding:6px;">
-        <div style="font-size:0.8rem; margin-bottom:4px; font-weight:600;">Équipe 1</div>
-        <input id="team1-name" class="form-input" type="text" value="Équipe 1" style="margin-bottom:4px;">
-        <input id="team1-tag" class="form-input" type="text" value="EQ1" maxlength="3" style="margin-bottom:4px; text-transform:uppercase;">
-        <label style="font-size:0.75rem; color:var(--text-muted);">Couleur</label>
-        <input id="team1-color" type="color" value="#FFD600" style="width:100%; margin-top:2px;">
+          <button type="button" class="btn-secondary" id="btn-refresh-teams-assignment">
+            Mettre à jour la liste des joueurs
+          </button>
+
+          <div id="teams-assignment" style="margin-top:8px; font-size:0.8rem;">
+            <div style="color:var(--text-muted);">
+              Cliquez sur « Mettre à jour la liste des joueurs » pour assigner chaque joueur à une équipe.
+            </div>
+          </div>
+        </div>
       </div>
-
-      <!-- ÉQUIPE 2 -->
-      <div style="flex:1; border:1px solid var(--border); border-radius:8px; padding:6px;">
-        <div style="font-size:0.8rem; margin-bottom:4px; font-weight:600;">Équipe 2</div>
-        <input id="team2-name" class="form-input" type="text" value="Équipe 2" style="margin-bottom:4px;">
-        <input id="team2-tag" class="form-input" type="text" value="EQ2" maxlength="3" style="margin-bottom:4px; text-transform:uppercase;">
-        <label style="font-size:0.75rem; color:var(--text-muted);">Couleur</label>
-        <input id="team2-color" type="color" value="#00AEEF" style="width:100%; margin-top:2px;">
-      </div>
-    </div>
-
-    <!-- Assignation joueurs ↔ équipes -->
-    <button type="button" class="btn-secondary" id="btn-refresh-teams-assignment">
-      Mettre à jour la liste des joueurs
-    </button>
-
-    <div id="teams-assignment" style="margin-top:8px; font-size:0.8rem;">
-      <div style="color:var(--text-muted);">
-        Cliquez sur « Mettre à jour la liste des joueurs » pour assigner chaque joueur à une équipe.
-      </div>
-    </div>
-
-  </div>
-</div>
 
       <button class="btn-primary" id="btn-start">Lancer le Tour</button>
       <div class="error-text" id="setup-error"></div>
 
-      <button class="btn-secondary" id="btn-demo">
-        Remplir un exemple
-      </button>
-  
-
-
+      <button class="btn-secondary" id="btn-demo">Remplir un exemple</button>
     </div>
   </div>
 
-  <!-- MODAL CLASSEMENTS -->
   <div class="modal-backdrop" id="classement-modal" style="display:none;">
     <div class="modal">
       <h1>Classements</h1>
@@ -542,1664 +615,1729 @@
 
       <div id="classement-content" style="max-height:60vh; overflow-y:auto; font-size:0.85rem;"></div>
 
-      <button class="btn-secondary" id="btn-classement-close" style="margin-top:10px;">
-        Fermer
-      </button>
+      <button class="btn-secondary" id="btn-classement-close" style="margin-top:10px;">Fermer</button>
     </div>
   </div>
+</div>
 
-  <script>
-    // ======== ÉTAT GLOBAL ========
+<div class="modal-backdrop" id="supabase-config-modal" style="display:none;">
+  <div class="modal">
+    <h1>Configurer Supabase</h1>
+    <p>Collez votre URL Supabase et votre clé anon. Elles seront stockées en local sur cet appareil.</p>
 
-// === Sprint (Maillot Vert) ===
-let sprintActif = false;
-let sprintCooldown = 0; // timestamp du prochain sprint autorisé
-let sprintLanceur = null; // id du joueur qui lance
+    <div class="form-group">
+      <label class="form-label" for="supabase-url-input">Supabase URL</label>
+      <input id="supabase-url-input" class="form-input" type="text" placeholder="https://xxxx.supabase.co" />
+    </div>
 
-// === Côte (Maillot à Pois) ===
-let coteActive = false;
-let coteCible = null; // % d'arrêt
-// Compteur de pintes
+    <div class="form-group">
+      <label class="form-label" for="supabase-key-input">Supabase anon key</label>
+      <input id="supabase-key-input" class="form-input" type="text" placeholder="eyJhbGciOi..." />
+    </div>
 
+    <button class="btn-primary" id="btn-save-supabase">Enregistrer</button>
+    <button class="btn-secondary" id="btn-close-supabase">Fermer</button>
+    <div class="error-text" id="supabase-config-error"></div>
+  </div>
+</div>
 
-// === Échappée (Maillot Blanc) ===
-let echappeeActive = false;
-let echappeeClics = []; // { id, timestamp }
+<div id="player-content">
+  <div class="app">
+    <header class="header">
+      <div class="timer-label">Mode Player</div>
+      <div class="next-event">Partage ton code salle avec le Host.</div>
+    </header>
 
-// === Incidents ===
-let incidentActif = false;
-let incidentData = null;   // Contient l'incident en cours
+    <div class="player-card">
+      <div class="form-group">
+        <label class="form-label" for="player-room-code">Code salle</label>
+        <input id="player-room-code" class="form-input" type="text" placeholder="ABC123" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="player-name">Prénom</label>
+        <input id="player-name" class="form-input" type="text" placeholder="Camille" />
+      </div>
+      <button id="btn-player-join" class="btn-primary">Rejoindre la salle</button>
+      <div class="player-status" id="player-status"></div>
+      <button id="btn-player-finish" class="player-finish" style="display:none;">J’ai fini ma pinte</button>
+    </div>
+  </div>
+</div>
 
-const incidentsList = [
-  { id: 1, type: "player", label: "Pas de main droite", duration: "1-pinte" },
-  { id: 2, type: "player", label: "Pas de main gauche", duration: "1-pinte" },
-  { id: 3, type: "player", label: "Boire debout", duration: "1-pinte" },
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // === SUPABASE CONFIG ===
+  // Remplacez ces placeholders avant déploiement (Vercel -> Variables d’environnement).
+  // Pour une version statique, définissez window.SUPABASE_URL et window.SUPABASE_ANON_KEY avant ce script.
+  function loadSupabaseConfig() {
+    const storedUrl = localStorage.getItem("supabaseUrl");
+    const storedKey = localStorage.getItem("supabaseAnonKey");
+    const metaUrl = document.querySelector('meta[name="supabase-url"]')?.content;
+    const metaKey = document.querySelector('meta[name="supabase-anon-key"]')?.content;
 
-  { id: 4, type: "all", label: "Tout le monde change de place", duration: "instant" },
-
-  { id: 5, type: "player", label: "Boire sans poser le verre", duration: "1-pinte" },
-  { id: 6, type: "player", label: "Main sur la tête en buvant", duration: "1-pinte" },
-  
-  { id: 7, type: "player", label: "Doit annoncer 'À l’attaque !' avant chaque gorgée", duration: "1-pinte" },
-  { id: 8, type: "all", label: "Tout le monde doit boire un verre d'eau", duration: "instant" },
-
-  { id: 9, type: "player", label: "Interdiction de regarder le joueur choisi", duration: "5-min" },
-  { id: 10, type: "player", label: "Accent imposé", duration: "5-min" },
-
-  { id: 11, type: "gameplay", label: "+5 secondes sur la prochaine pinte", duration: "1-pinte" },
-  { id: 12, type: "gameplay", label: "Interdiction de lancer le prochain sprint", duration: "15-min" }
-];
-
-
-
-    const state = {
-      joueurs: [],
-      // Durée en minutes / fin du Tour
-      dureeMinutes: 180,
-      tourFinTimestamp: null,
-      tourStartTimestamp: null,
-      timerInterval: null,
-
-      // Maillot Jaune
-      pinteEnCours: true,
-      finPinteOrdre: [], // { joueurId, timestamp }
-      
-      // Compteur de pintes
-      numeroPinte: 1,
-
-      // Profil de l'étape
-      difficulte: "Plaine",
-
-      // Timeline des événements (remplie au lancement)
-      timelineEvents: [],
-
-      // Equipes
-      teams: []
-
+    return {
+      url: window.SUPABASE_URL || metaUrl || storedUrl || "YOUR_SUPABASE_URL",
+      anonKey: window.SUPABASE_ANON_KEY || metaKey || storedKey || "YOUR_SUPABASE_ANON_KEY"
     };
+  }
 
-// ======== SAUVEGARDE LOCALSTORAGE ========
-const SAVE_KEY = "tiboPinartSaveV1";
+  let SUPABASE_CONFIG = loadSupabaseConfig();
 
-function buildSavePayload() {
-  return {
-    version: 1,
-    savedAt: Date.now(),
-    state: {
-      joueurs: state.joueurs,
-      dureeMinutes: state.dureeMinutes,
-      tourFinTimestamp: state.tourFinTimestamp,
-      tourStartTimestamp: state.tourStartTimestamp,
-      pinteEnCours: state.pinteEnCours,
-      finPinteOrdre: state.finPinteOrdre,
-      numeroPinte: state.numeroPinte,
-      difficulte: state.difficulte,
-      timelineEvents: state.timelineEvents,
-      teams: state.teams
-    }
+  function isSupabaseReady(config) {
+    return config.url && config.anonKey &&
+      !config.url.includes("YOUR_SUPABASE") &&
+      !config.anonKey.includes("YOUR_SUPABASE");
+  }
+
+  let supabaseReady = isSupabaseReady(SUPABASE_CONFIG);
+  let supabaseClient = supabaseReady ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey) : null;
+
+  const state = {
+    joueurs: [],
+    dureeMinutes: 180,
+    tourFinTimestamp: null,
+    tourStartTimestamp: null,
+    timerInterval: null,
+    pinteEnCours: true,
+    finPinteOrdre: [],
+    numeroPinte: 1,
+    difficulte: "Plaine",
+    timelineEvents: [],
+    teams: [],
+    roomId: null,
+    roomCode: null,
+    roomSubscription: null,
+    dataMode: "events",
+    memberNameCache: new Map()
   };
-}
 
-function saveGame() {
-  try {
-    const payload = buildSavePayload();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    // console.log("Partie sauvegardée", payload);
-  } catch (e) {
-    console.error("Erreur de sauvegarde Tibo Pinart :", e);
+  let sprintActif = false;
+  let sprintCooldown = 0;
+  let sprintLanceur = null;
+
+  let coteActive = false;
+  let coteCible = null;
+
+  let echappeeActive = false;
+  let echappeeClics = [];
+
+  let incidentActif = false;
+  let incidentData = null;
+
+  const incidentsList = [
+    { id: 1, type: "player", label: "Pas de main droite", duration: "1-pinte" },
+    { id: 2, type: "player", label: "Pas de main gauche", duration: "1-pinte" },
+    { id: 3, type: "player", label: "Boire debout", duration: "1-pinte" },
+    { id: 4, type: "all", label: "Tout le monde change de place", duration: "instant" },
+    { id: 5, type: "player", label: "Boire sans poser le verre", duration: "1-pinte" },
+    { id: 6, type: "player", label: "Main sur la tête en buvant", duration: "1-pinte" },
+    { id: 7, type: "player", label: "Doit annoncer 'À l’attaque !' avant chaque gorgée", duration: "1-pinte" },
+    { id: 8, type: "all", label: "Tout le monde doit boire un verre d'eau", duration: "instant" },
+    { id: 9, type: "player", label: "Interdiction de regarder le joueur choisi", duration: "5-min" },
+    { id: 10, type: "player", label: "Accent imposé", duration: "5-min" },
+    { id: 11, type: "gameplay", label: "+5 secondes sur la prochaine pinte", duration: "1-pinte" },
+    { id: 12, type: "gameplay", label: "Interdiction de lancer le prochain sprint", duration: "15-min" }
+  ];
+
+  const elTimer = document.getElementById("timer");
+  const elNextEvent = document.getElementById("next-event");
+  const elPlayersCard = document.getElementById("players-card");
+  const elEventZone = document.getElementById("event-zone");
+  const elSetupModal = document.getElementById("setup-modal");
+  const elDuration = document.getElementById("tour-duration");
+  const elPlayersInput = document.getElementById("players-input");
+  const elSetupError = document.getElementById("setup-error");
+  const elBtnStart = document.getElementById("btn-start");
+  const elBtnDemo = document.getElementById("btn-demo");
+  const elClassementModal = document.getElementById("classement-modal");
+  const elClassementContent = document.getElementById("classement-content");
+  const elBtnClassementClose = document.getElementById("btn-classement-close");
+  const elBtnSettings = document.getElementById("btn-settings");
+  const elTeamsCard = document.getElementById("teams-card");
+
+  const elTeamsEnabled = document.getElementById("teams-enabled");
+  const elTeam1Name = document.getElementById("team1-name");
+  const elTeam1Tag = document.getElementById("team1-tag");
+  const elTeam1Color = document.getElementById("team1-color");
+  const elTeam2Name = document.getElementById("team2-name");
+  const elTeam2Tag = document.getElementById("team2-tag");
+  const elTeam2Color = document.getElementById("team2-color");
+  const elTeamsAssignment = document.getElementById("teams-assignment");
+  const elBtnRefreshTeams = document.getElementById("btn-refresh-teams-assignment");
+  const elTeamsSetup = document.getElementById("teams-setup");
+
+  const elCoverScreen = document.getElementById("cover-screen");
+  const elBtnModeHost = document.getElementById("btn-mode-host");
+  const elBtnModePlayer = document.getElementById("btn-mode-player");
+  const elMainContent = document.getElementById("main-content");
+  const elPlayerContent = document.getElementById("player-content");
+  const elSupabaseWarning = document.getElementById("supabase-warning");
+  const elSupabaseStatus = document.getElementById("supabase-status");
+  const elRoomCodeValue = document.getElementById("room-code-value");
+  const elCopyRoom = document.getElementById("btn-copy-room");
+
+  const elPlayerRoomCode = document.getElementById("player-room-code");
+  const elPlayerName = document.getElementById("player-name");
+  const elBtnPlayerJoin = document.getElementById("btn-player-join");
+  const elBtnPlayerFinish = document.getElementById("btn-player-finish");
+  const elPlayerStatus = document.getElementById("player-status");
+
+  const elSupabaseConfigModal = document.getElementById("supabase-config-modal");
+  const elSupabaseUrlInput = document.getElementById("supabase-url-input");
+  const elSupabaseKeyInput = document.getElementById("supabase-key-input");
+  const elSupabaseConfigError = document.getElementById("supabase-config-error");
+  const elBtnConfigSupabase = document.getElementById("btn-config-supabase");
+  const elBtnSaveSupabase = document.getElementById("btn-save-supabase");
+  const elBtnCloseSupabase = document.getElementById("btn-close-supabase");
+
+  const sndSprint = document.getElementById("snd-sprint");
+  const sndCote = document.getElementById("snd-cote");
+  const sndEchappee = document.getElementById("snd-echappee");
+  const sndIncident = document.getElementById("snd-incident");
+
+  function formatTimeHMS(totalSeconds) {
+    if (totalSeconds < 0) totalSeconds = 0;
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+    const pad = (x) => x.toString().padStart(2, "0");
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
   }
-}
 
-function clearSavedGame() {
-  try {
-    localStorage.removeItem(SAVE_KEY);
-  } catch (e) {
-    console.error("Erreur suppression sauvegarde :", e);
+  function formatDeltaSeconds(sec) {
+    const sign = sec >= 0 ? "+" : "-";
+    const abs = Math.abs(sec);
+    const sInt = Math.floor(abs);
+    const centi = Math.round((abs - sInt) * 100);
+    return `${sign}${sInt}\"${centi.toString().padStart(2, "0")}`;
   }
-}
 
+  function nowSeconds() {
+    return Date.now() / 1000;
+  }
 
-    // ======== UTILITAIRES ========
+  function generateRoomCode(length = 6) {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let out = "";
+    for (let i = 0; i < length; i += 1) {
+      out += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return out;
+  }
 
-    function formatTimeHMS(totalSeconds) {
-      if (totalSeconds < 0) totalSeconds = 0;
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = Math.floor(totalSeconds % 60);
-      const pad = (x) => x.toString().padStart(2, "0");
-      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  function setEventZone(title, body) {
+    let titleEl = elEventZone.querySelector(".event-title");
+    let bodyEl = elEventZone.querySelector(".event-body");
+
+    if (!titleEl || !bodyEl) {
+      elEventZone.innerHTML = `
+        <div class="event-title"></div>
+        <div class="event-body"></div>
+      `;
+      titleEl = elEventZone.querySelector(".event-title");
+      bodyEl = elEventZone.querySelector(".event-body");
     }
 
-    function formatDeltaSeconds(sec) {
-      // sec float
-      const sign = sec >= 0 ? "+" : "-";
-      const abs = Math.abs(sec);
-      const sInt = Math.floor(abs);
-      const centi = Math.round((abs - sInt) * 100);
-      const pad2 = (x) => x.toString().padStart(2, "0");
-      return `${sign}${sInt}"${centi.toString().padStart(2, "0")}`;
+    if (titleEl) titleEl.textContent = title;
+    if (bodyEl) bodyEl.textContent = body;
+  }
+
+  function showSupabaseError(message) {
+    if (elSupabaseStatus) {
+      elSupabaseStatus.textContent = message;
+      elSupabaseStatus.style.display = "block";
+    }
+    setEventZone("Supabase", message);
+  }
+
+  async function ensureSignedIn() {
+    if (!supabaseClient) return null;
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    if (sessionData?.session) return sessionData.session;
+
+    const { data, error } = await supabaseClient.auth.signInAnonymously();
+    if (error) {
+      throw error;
+    }
+    return data.session;
+  }
+
+  function playSound(type) {
+    let audio = null;
+    if (type === "SPRINT") audio = sndSprint;
+    if (type === "COTE") audio = sndCote;
+    if (type === "ECHAPPEE") audio = sndEchappee;
+    if (type === "INCIDENT") audio = sndIncident;
+
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+  }
+
+  function refreshTeamsAssignmentUI() {
+    if (!elTeamsAssignment) return;
+
+    const rawNames = elPlayersInput.value
+      .split("\n")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    if (rawNames.length === 0) {
+      elTeamsAssignment.innerHTML =
+        '<div style="color:var(--text-muted);">Ajoutez d\'abord des joueurs dans la liste au-dessus.</div>';
+      return;
     }
 
-    function nowSeconds() {
-      return Date.now() / 1000;
+    let html = '<div style="margin-top:4px;">';
+    rawNames.forEach((name, idx) => {
+      const idSelect = `team-assign-${idx}`;
+      html += `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <span>${name}</span>
+          <select id="${idSelect}" class="form-select" style="max-width:150px;">
+            <option value="">Aucune équipe</option>
+            <option value="1">Équipe 1</option>
+            <option value="2">Équipe 2</option>
+          </select>
+        </div>
+      `;
+    });
+    html += "</div>";
+
+    elTeamsAssignment.innerHTML = html;
+  }
+
+  function computeOccurrences(dureeMinutes, difficulte) {
+    const H = dureeMinutes / 60;
+    let sprints, cotes, echappees, incidents;
+
+    if (difficulte === "Ville") {
+      sprints = 1 * H;
+      cotes = Math.max(1, Math.round(0.5 * H));
+      echappees = Math.round(1.5 * H);
+      incidents = 2 * H;
+    } else if (difficulte === "Plaine") {
+      sprints = 2 * H;
+      cotes = 1 * H;
+      echappees = 3 * H;
+      incidents = 4 * H;
+    } else if (difficulte === "Montagne") {
+      sprints = 3 * H;
+      cotes = 2 * H;
+      echappees = 4 * H;
+      incidents = 6 * H;
+    } else {
+      sprints = 2 * H;
+      cotes = 1 * H;
+      echappees = 3 * H;
+      incidents = 4 * H;
     }
 
-    function refreshTeamsAssignmentUI() {
-      if (!elTeamsAssignment) return;
+    return {
+      sprints: Math.max(1, Math.round(sprints)),
+      cotes: Math.max(1, Math.round(cotes)),
+      echappees: Math.max(1, Math.round(echappees)),
+      incidents: Math.max(1, Math.round(incidents))
+    };
+  }
 
-      const rawNames = elPlayersInput.value
-        .split("\n")
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+  function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
-      if (rawNames.length === 0) {
-        elTeamsAssignment.innerHTML =
-          '<div style="color:var(--text-muted);">Ajoutez d\'abord des joueurs dans la liste au-dessus.</div>';
+  function buildTimeline(dureeMinutes, occurrences) {
+    const totalSeconds = dureeMinutes * 60;
+    const events = [];
+
+    for (let i = 0; i < occurrences.sprints; i++) events.push("SPRINT");
+    for (let i = 0; i < occurrences.cotes; i++) events.push("COTE");
+    for (let i = 0; i < occurrences.echappees; i++) events.push("ECHAPPEE");
+    for (let i = 0; i < occurrences.incidents; i++) events.push("INCIDENT");
+
+    if (events.length === 0) return [];
+
+    const shuffled = shuffleArray(events);
+    const N = shuffled.length;
+    const slotSize = totalSeconds / N;
+
+    const timeline = [];
+
+    for (let i = 0; i < N; i++) {
+      const base = i * slotSize;
+      const t = base + Math.random() * slotSize;
+      timeline.push({
+        timeOffset: t,
+        type: shuffled[i],
+        fired: false
+      });
+    }
+
+    timeline.sort((a, b) => a.timeOffset - b.timeOffset);
+
+    return timeline;
+  }
+
+  function describeEventType(type) {
+    if (type === "SPRINT") return "Sprint (maillot vert)";
+    if (type === "COTE") return "Côte (maillot à pois)";
+    if (type === "ECHAPPEE") return "Échappée (maillot blanc)";
+    if (type === "INCIDENT") return "Incident de course";
+    return type;
+  }
+
+  function updateNextEventLabel() {
+    if (!elNextEvent) return;
+
+    if (!state.timelineEvents || state.timelineEvents.length === 0 || !state.tourStartTimestamp) {
+      elNextEvent.textContent = "Prochain événement : aucun";
+      return;
+    }
+
+    const now = nowSeconds();
+    const elapsed = now - state.tourStartTimestamp;
+
+    const next = state.timelineEvents.find((ev) => !ev.fired && ev.timeOffset > elapsed);
+
+    if (!next) {
+      elNextEvent.textContent = "Prochain événement : aucun (fin du Tour)";
+      return;
+    }
+
+    const secondsToGo = Math.max(0, Math.round(next.timeOffset - elapsed));
+    const minutes = Math.floor(secondsToGo / 60);
+    const secs = secondsToGo % 60;
+
+    const tStr = minutes > 0
+      ? `${minutes} min ${secs.toString().padStart(2, "0")} s`
+      : `${secs} s`;
+
+    elNextEvent.textContent = `Prochain événement : ${describeEventType(next.type)} dans ${tStr}`;
+  }
+
+  function isAnyEventActive() {
+    return sprintActif || coteActive || echappeeActive || incidentActif;
+  }
+
+  function checkTimelineEvents() {
+    if (!state.timelineEvents || state.timelineEvents.length === 0 || !state.tourStartTimestamp) {
+      return;
+    }
+
+    if (isAnyEventActive()) {
+      return;
+    }
+
+    const now = nowSeconds();
+    const elapsed = now - state.tourStartTimestamp;
+
+    state.timelineEvents.forEach((ev) => {
+      if (!ev.fired && ev.timeOffset <= elapsed) {
+        ev.fired = true;
+
+        if (ev.type === "SPRINT") {
+          if (!sprintActif) {
+            sprintActif = true;
+            sprintLanceur = null;
+            renderSprintInterface();
+            playSound("SPRINT");
+          }
+        } else if (ev.type === "COTE") {
+          if (!coteActive) {
+            coteActive = true;
+            coteCible = Math.floor(20 + Math.random() * 60);
+            renderCoteInterface();
+            playSound("COTE");
+          }
+        } else if (ev.type === "ECHAPPEE") {
+          if (!echappeeActive) {
+            echappeeActive = true;
+            echappeeClics = [];
+            renderEchappeeInterface();
+            playSound("ECHAPPEE");
+          }
+        } else if (ev.type === "INCIDENT") {
+          if (!incidentActif) {
+            incidentActif = true;
+            incidentData = incidentsList[Math.floor(Math.random() * incidentsList.length)];
+            renderIncidentInterface();
+            playSound("INCIDENT");
+          }
+        }
+      }
+    });
+
+    cleanExpiredIncidents();
+  }
+
+  function tickTimer() {
+    const remaining = Math.floor(state.tourFinTimestamp - nowSeconds());
+
+    if (remaining <= 0) {
+      clearInterval(state.timerInterval);
+      elTimer.textContent = "00:00:00";
+      endTour();
+    } else {
+      elTimer.textContent = formatTimeHMS(remaining);
+    }
+
+    updateNextEventLabel();
+    checkTimelineEvents();
+  }
+
+  function ouvrirClassements() {
+    if (state.joueurs.length === 0) {
+      elClassementContent.innerHTML = "<p>Aucun joueur pour l'instant.</p>";
+      elClassementModal.style.display = "flex";
+      return;
+    }
+
+    const joueurs = [...state.joueurs];
+
+    const jaune = [...joueurs].sort((a, b) => a.tempsCumulé - b.tempsCumulé);
+    const leaderJaune = jaune[0].tempsCumulé;
+
+    const vert = [...joueurs].sort((a, b) => b.pointsVert - a.pointsVert);
+    const pois = [...joueurs].sort((a, b) => b.pointsPois - a.pointsPois);
+    const blanc = [...joueurs].sort((a, b) => b.pointsBlanc - a.pointsBlanc);
+
+    let html = "";
+
+    html += '<h3 style="margin:6px 0;">🟡 Maillot Jaune</h3>';
+    html += '<ul style="list-style:none; padding-left:0; margin:0 0 8px 0;">';
+    jaune.slice(0, 3).forEach((j, idx) => {
+      const delta = j.tempsCumulé - leaderJaune;
+      const deltaStr = idx === 0 ? "leader" : formatDeltaSeconds(delta);
+      html += `<li>${idx + 1}. <b>${j.nom}</b> – ${deltaStr}</li>`;
+    });
+    html += "</ul>";
+
+    html += '<h3 style="margin:6px 0;">🟢 Maillot Vert</h3>';
+    html += '<ul style="list-style:none; padding-left:0; margin:0 0 8px 0;">';
+    vert.slice(0, 3).forEach((j, idx) => {
+      html += `<li>${idx + 1}. <b>${j.nom}</b> – ${j.pointsVert} pts</li>`;
+    });
+    html += "</ul>";
+
+    html += '<h3 style="margin:6px 0;">🔴 Maillot à Pois</h3>';
+    html += '<ul style="list-style:none; padding-left:0; margin:0 0 8px 0;">';
+    pois.slice(0, 3).forEach((j, idx) => {
+      html += `<li>${idx + 1}. <b>${j.nom}</b> – ${j.pointsPois} pts</li>`;
+    });
+    html += "</ul>";
+
+    html += '<h3 style="margin:6px 0;">⚪ Maillot Blanc</h3>';
+    html += '<ul style="list-style:none; padding-left:0; margin:0;">';
+    blanc.slice(0, 3).forEach((j, idx) => {
+      html += `<li>${idx + 1}. <b>${j.nom}</b> – ${j.pointsBlanc} pts</li>`;
+    });
+    html += "</ul>";
+
+    elClassementContent.innerHTML = html;
+    elClassementModal.style.display = "flex";
+  }
+
+  function endTour() {
+    setEventZone(
+      "Fin du Tour",
+      "Le temps est écoulé. Le Maillot Jaune est attribué au joueur avec le plus petit temps cumulé. Les autres maillots seront gérés dans une prochaine version."
+    );
+    const buttons = document.querySelectorAll(".btn-fini");
+    buttons.forEach((b) => (b.disabled = true));
+  }
+
+  function renderPlayers() {
+    const sorted = [...state.joueurs].sort((a, b) => a.tempsCumulé - b.tempsCumulé);
+
+    elPlayersCard.innerHTML = "";
+
+    const leader = sorted.length > 0 ? sorted[0].tempsCumulé : 0;
+
+    sorted.forEach((j, index) => {
+      const row = document.createElement("div");
+      row.className = "player-row";
+
+      const topLine = document.createElement("div");
+      topLine.className = "player-top-line";
+
+      const left = document.createElement("div");
+      left.style.display = "flex";
+      left.style.alignItems = "center";
+
+      const rank = document.createElement("div");
+      rank.className = "player-rank";
+      rank.textContent = `${index + 1}.`;
+      left.appendChild(rank);
+
+      const name = document.createElement("div");
+      name.className = "player-name";
+      name.textContent = j.nom;
+      left.appendChild(name);
+
+      if (j.equipeId && state.teams && state.teams.length > 0) {
+        const team = state.teams.find((t) => t.id === j.equipeId);
+        if (team) {
+          const teamBadge = document.createElement("span");
+          teamBadge.style.marginLeft = "6px";
+          teamBadge.style.padding = "2px 6px";
+          teamBadge.style.borderRadius = "999px";
+          teamBadge.style.fontSize = "0.7rem";
+          teamBadge.style.fontWeight = "600";
+          teamBadge.style.backgroundColor = team.color || "#444";
+          teamBadge.style.color = "#000";
+          teamBadge.style.textTransform = "uppercase";
+          teamBadge.textContent = team.tag || "EQ";
+
+          left.appendChild(teamBadge);
+        }
+      }
+
+      topLine.appendChild(left);
+
+      if (j.incidentActif && j.incidentLabel) {
+        const inc = document.createElement("div");
+        inc.className = "player-incidents";
+        inc.textContent = `⚠ ${j.incidentLabel}`;
+        topLine.appendChild(inc);
+      }
+
+      row.appendChild(topLine);
+
+      const badges = document.createElement("div");
+      badges.className = "player-maillots";
+
+      const badgeJaune = document.createElement("div");
+      badgeJaune.className = "badge";
+      const dotJ = document.createElement("span");
+      dotJ.className = "badge-yellow-dot";
+      const labelJ = document.createElement("span");
+
+      if (j.tempsCumulé === leader) {
+        labelJ.textContent = "🟡 leader";
+      } else {
+        const delta = j.tempsCumulé - leader;
+        labelJ.textContent = formatDeltaSeconds(delta);
+      }
+      badgeJaune.appendChild(dotJ);
+      badgeJaune.appendChild(labelJ);
+      badges.appendChild(badgeJaune);
+
+      const badgeVert = document.createElement("div");
+      badgeVert.className = "badge";
+      const dotV = document.createElement("span");
+      dotV.className = "badge-green-dot";
+      const labelV = document.createElement("span");
+      labelV.textContent = `${j.pointsVert} pts`;
+      badgeVert.appendChild(dotV);
+      badgeVert.appendChild(labelV);
+      badges.appendChild(badgeVert);
+
+      const badgePois = document.createElement("div");
+      badgePois.className = "badge";
+      const dotP = document.createElement("span");
+      dotP.className = "badge-red-dot";
+      const labelP = document.createElement("span");
+      labelP.textContent = `${j.pointsPois} pts`;
+      badgePois.appendChild(dotP);
+      badgePois.appendChild(labelP);
+      badges.appendChild(badgePois);
+
+      const badgeBlanc = document.createElement("div");
+      badgeBlanc.className = "badge";
+      const dotB = document.createElement("span");
+      dotB.className = "badge-white-dot";
+      const labelB = document.createElement("span");
+      labelB.textContent = `${j.pointsBlanc} pts`;
+      badgeBlanc.appendChild(dotB);
+      badgeBlanc.appendChild(labelB);
+      badges.appendChild(badgeBlanc);
+
+      row.appendChild(badges);
+
+      const actions = document.createElement("div");
+      actions.className = "player-actions";
+      const btn = document.createElement("button");
+      btn.className = "btn-fini";
+      btn.textContent = "Fini";
+
+      btn.disabled = !state.pinteEnCours || j.aFiniCettePinte;
+
+      btn.addEventListener("click", () => {
+        handlePlayerFinish(j.id);
+      });
+
+      actions.appendChild(btn);
+      row.appendChild(actions);
+
+      elPlayersCard.appendChild(row);
+    });
+
+    renderTeams();
+  }
+
+  function renderTeams() {
+    if (!elTeamsCard) return;
+
+    if (!state.teams || state.teams.length === 0) {
+      elTeamsCard.style.display = "none";
+      elTeamsCard.innerHTML = "";
+      return;
+    }
+
+    const statsMap = new Map();
+    state.teams.forEach((t) => {
+      statsMap.set(t.id, {
+        team: t,
+        totalTemps: 0,
+        totalVerts: 0,
+        totalPois: 0,
+        totalBlancs: 0,
+        nbJoueurs: 0
+      });
+    });
+
+    state.joueurs.forEach((j) => {
+      if (!j.equipeId || !statsMap.has(j.equipeId)) return;
+      const s = statsMap.get(j.equipeId);
+      s.totalTemps += j.tempsCumulé;
+      s.totalVerts += j.pointsVert;
+      s.totalPois += j.pointsPois;
+      s.totalBlancs += j.pointsBlanc;
+      s.nbJoueurs += 1;
+    });
+
+    let stats = Array.from(statsMap.values()).filter((s) => s.nbJoueurs > 0);
+    if (stats.length === 0) {
+      elTeamsCard.style.display = "none";
+      elTeamsCard.innerHTML = "";
+      return;
+    }
+
+    stats.forEach((s) => {
+      s.avgTemps = s.totalTemps / s.nbJoueurs;
+    });
+    stats.sort((a, b) => a.avgTemps - b.avgTemps);
+
+    const bestAvg = stats[0].avgTemps;
+
+    let html = "";
+
+    stats.forEach((s, idx) => {
+      const delta = s.avgTemps - bestAvg;
+      const deltaStr = idx === 0 ? "leader" : formatDeltaSeconds(delta);
+
+      html += `
+        <div class="player-row">
+          <div class="player-top-line">
+            <div style="display:flex; align-items:center;">
+              <div class="player-rank">${idx + 1}.</div>
+              <div class="player-name">
+                <span style="
+                  display:inline-flex;
+                  align-items:center;
+                  padding:2px 8px;
+                  border-radius:999px;
+                  font-size:0.75rem;
+                  font-weight:700;
+                  margin-right:6px;
+                  background:${s.team.color || "#444"};
+                  color:#000;
+                  text-transform:uppercase;
+                ">
+                  ${s.team.tag || "EQ"}
+                </span>
+                ${s.team.name || "Équipe"}
+              </div>
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">
+              ${deltaStr}
+            </div>
+          </div>
+
+          <div class="player-maillots">
+            <div class="badge">
+              <span class="badge-green-dot"></span>
+              <span>${s.totalVerts} pts</span>
+            </div>
+            <div class="badge">
+              <span class="badge-red-dot"></span>
+              <span>${s.totalPois} pts</span>
+            </div>
+            <div class="badge">
+              <span class="badge-white-dot"></span>
+              <span>${s.totalBlancs} pts</span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    elTeamsCard.innerHTML = html;
+    elTeamsCard.style.display = "block";
+  }
+
+  function handlePlayerFinish(joueurId) {
+    if (!state.pinteEnCours) return;
+
+    const joueur = state.joueurs.find((j) => j.id === joueurId);
+    if (!joueur) return;
+    if (joueur.aFiniCettePinte) return;
+
+    const t = nowSeconds();
+    joueur.aFiniCettePinte = true;
+    state.finPinteOrdre.push({ joueurId, timestamp: t });
+
+    setEventZone(
+      "Arrivée enregistrée",
+      `${joueur.nom} a terminé sa pinte. Quand tout le monde a fini, le classement de l’étape sera calculé.`
+    );
+
+    const allFinished = state.joueurs.every((j) => j.aFiniCettePinte);
+    if (allFinished) {
+      finalizeStage();
+    } else {
+      renderPlayers();
+    }
+  }
+
+  function finalizeStage() {
+    if (state.finPinteOrdre.length === 0) return;
+
+    const classement = [...state.finPinteOrdre].sort((a, b) => a.timestamp - b.timestamp);
+    const t0 = classement[0].timestamp;
+    const bonus = [5, 2, 1];
+
+    let resumeEtape = "Résultat de l’étape :\n";
+
+    classement.forEach((entry, idx) => {
+      const joueur = state.joueurs.find((j) => j.id === entry.joueurId);
+      if (!joueur) return;
+
+      const brut = entry.timestamp - t0;
+      const b = idx < bonus.length ? bonus[idx] : 0;
+      let net = brut - b;
+      if (net < 0) net = 0;
+
+      joueur.tempsCumulé += net;
+
+      const rang = idx + 1;
+      const deltaStr = formatDeltaSeconds(brut);
+      const netStr = formatDeltaSeconds(net);
+
+      resumeEtape += `${rang}. ${joueur.nom} (${deltaStr}, bonif -${b}\", net ${netStr})\n`;
+    });
+
+    state.pinteEnCours = true;
+    state.finPinteOrdre = [];
+    state.joueurs.forEach((j) => {
+      j.aFiniCettePinte = false;
+    });
+
+    state.numeroPinte += 1;
+    cleanExpiredIncidents();
+
+    renderPlayers();
+
+    setEventZone("Étape terminée", resumeEtape.trim());
+
+    if (supabaseClient && state.roomId && state.dataMode === "pinte_finishes") {
+      supabaseClient.from("rooms").update({
+        pint_no: state.numeroPinte
+      }).eq("id", state.roomId);
+    }
+  }
+
+  function renderSprintInterface() {
+    const html = [];
+
+    html.push('<div class="event-title">⚡ SPRiNT !</div>');
+    html.push('<div class="event-body">Classez les joueurs dans l\'ordre d\'arrivée :</div>');
+
+    html.push('<div style="margin-top:10px;">');
+    state.joueurs.forEach((j) => {
+      html.push(`
+        <div style="margin-bottom:8px;">
+          <label style="font-size:0.85rem;">${j.nom}</label>
+          <select id="sprint-${j.id}" class="form-select">
+            ${state.joueurs.map((_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("")}
+          </select>
+        </div>
+      `);
+    });
+    html.push("</div>");
+
+    html.push(`
+      <button id="btn-valider-sprint" class="btn-primary" style="margin-top:12px;">
+        Valider le sprint
+      </button>
+    `);
+
+    document.getElementById("event-zone").innerHTML = html.join("");
+
+    document.getElementById("btn-valider-sprint").addEventListener("click", validerSprint);
+  }
+
+  function validerSprint() {
+    const classements = [];
+
+    state.joueurs.forEach((j) => {
+      const rank = parseInt(document.getElementById(`sprint-${j.id}`).value, 10);
+      classements.push({ id: j.id, rank });
+    });
+
+    classements.sort((a, b) => a.rank - b.rank);
+
+    const points = [10, 6, 4, 3, 2, 1];
+    let result = "Résultats du Sprint :\n\n";
+
+    classements.forEach((entry, idx) => {
+      const joueur = state.joueurs.find((j) => j.id === entry.id);
+      const p = points[idx] || 1;
+      joueur.pointsVert += p;
+      result += `${idx + 1}. ${joueur.nom} (+${p} pts)\n`;
+    });
+
+    sprintActif = false;
+    sprintCooldown = nowSeconds() + 900;
+    sprintLanceur = null;
+
+    renderPlayers();
+    setEventZone("Sprint terminé", result.trim());
+  }
+
+  function renderCoteInterface() {
+    const html = [];
+
+    html.push('<div class="event-title">⛰️ Côte</div>');
+    html.push(`<div class="event-body">Grimpez et arrêtez-vous à <b>${coteCible}%</b>. Quand tout le monde a stoppé, appuyez sur le bouton.</div>`);
+
+    html.push(`
+      <button id="btn-cote-stop" class="btn-primary" style="margin-top:12px;">
+        Tout le monde a stoppé
+      </button>
+    `);
+
+    document.getElementById("event-zone").innerHTML = html.join("");
+
+    document.getElementById("btn-cote-stop").addEventListener("click", renderCoteClassement);
+  }
+
+  function renderCoteClassement() {
+    const html = [];
+
+    html.push('<div class="event-title">Classement de la Côte</div>');
+    html.push('<div class="event-body">Classez les grimpeurs du plus précis au moins précis :</div>');
+
+    html.push('<div style="margin-top:10px;">');
+    state.joueurs.forEach((j) => {
+      html.push(`
+        <div style="margin-bottom:8px;">
+          <label style="font-size:0.85rem;">${j.nom}</label>
+          <select id="cote-${j.id}" class="form-select">
+            ${state.joueurs.map((_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("")}
+          </select>
+        </div>
+      `);
+    });
+    html.push("</div>");
+
+    html.push(`
+      <button id="btn-valider-cote" class="btn-primary" style="margin-top:12px;">
+        Valider la Côte
+      </button>
+    `);
+
+    document.getElementById("event-zone").innerHTML = html.join("");
+
+    document.getElementById("btn-valider-cote").addEventListener("click", validerCote);
+  }
+
+  function validerCote() {
+    const classements = [];
+
+    state.joueurs.forEach((j) => {
+      const rank = parseInt(document.getElementById(`cote-${j.id}`).value, 10);
+      classements.push({ id: j.id, rank });
+    });
+
+    classements.sort((a, b) => a.rank - b.rank);
+
+    const points = [8, 5, 3, 2, 1, 1, 1];
+
+    let recap = "Résultats de la Côte :\n\n";
+
+    classements.forEach((entry, idx) => {
+      const joueur = state.joueurs.find((j) => j.id === entry.id);
+      const p = points[idx] || 1;
+      joueur.pointsPois += p;
+      recap += `${idx + 1}. ${joueur.nom} (+${p} pts)\n`;
+    });
+
+    coteActive = false;
+    coteCible = null;
+
+    renderPlayers();
+
+    const html = `
+      <div class="event-title">Côte terminée</div>
+      <div class="event-body">${recap}</div>
+
+      <button id="btn-cote-ok" class="btn-primary" style="margin-top:12px;">
+        OK
+      </button>
+    `;
+
+    document.getElementById("event-zone").innerHTML = html;
+
+    document.getElementById("btn-cote-ok").addEventListener("click", () => {
+      setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini »." );
+    });
+  }
+
+  function renderEchappeeInterface() {
+    const html = [];
+
+    html.push('<div class="event-title">🚴 Échappée</div>');
+    html.push('<div class="event-body">Le plus rapide gagne ! Touchez votre bouton dès qu\'il apparaît :</div>');
+
+    html.push('<div style="margin-top:12px;">');
+
+    state.joueurs.forEach((j) => {
+      html.push(`
+        <button id="echappee-${j.id}" class="btn-primary" style="width:100%; margin-bottom:8px; background:#ffffff; color:#000;">
+          ${j.nom}
+        </button>
+      `);
+    });
+
+    html.push("</div>");
+
+    document.getElementById("event-zone").innerHTML = html.join("");
+
+    state.joueurs.forEach((j) => {
+      document.getElementById(`echappee-${j.id}`).addEventListener("click", () => {
+        handleEchappeeClick(j.id);
+      });
+    });
+  }
+
+  function handleEchappeeClick(joueurId) {
+    if (!echappeeActive) return;
+
+    echappeeClics.push({
+      id: joueurId,
+      t: nowSeconds()
+    });
+
+    if (echappeeClics.length === state.joueurs.length) {
+      finalizeEchappee();
+    }
+  }
+
+  function finalizeEchappee() {
+    echappeeActive = false;
+
+    echappeeClics.sort((a, b) => a.t - b.t);
+
+    const points = [3, 1];
+    let recap = "Résultats de l'échappée :\n\n";
+
+    echappeeClics.forEach((entry, idx) => {
+      const joueur = state.joueurs.find((j) => j.id === entry.id);
+      const p = points[idx] || 0;
+      joueur.pointsBlanc += p;
+      recap += `${idx + 1}. ${joueur.nom} (+${p} pts)\n`;
+    });
+
+    renderPlayers();
+
+    const html = `
+      <div class="event-title">Échappée terminée</div>
+      <div class="event-body">${recap}</div>
+
+      <button id="btn-echappee-ok" class="btn-primary" style="margin-top:12px;">
+        OK
+      </button>
+    `;
+
+    document.getElementById("event-zone").innerHTML = html;
+
+    document.getElementById("btn-echappee-ok").addEventListener("click", () => {
+      setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini »." );
+    });
+  }
+
+  function renderIncidentInterface() {
+    const inc = incidentData;
+
+    let target = null;
+    if (inc.type === "player") {
+      const idx = Math.floor(Math.random() * state.joueurs.length);
+      target = state.joueurs[idx];
+    }
+
+    let html = '<div class="event-title">⚠️ Incident</div>';
+
+    if (inc.type === "player") {
+      html += `<div class="event-body"><b>${inc.label}</b>\n\nCible : <b>${target.nom}</b></div>`;
+    } else if (inc.type === "all") {
+      html += `<div class="event-body"><b>${inc.label}</b>\n\nTous les joueurs sont concernés.</div>`;
+    } else {
+      html += `<div class="event-body"><b>${inc.label}</b>\n\nImpact gameplay.</div>`;
+    }
+
+    html += `
+      <button id="btn-incident-ok" class="btn-primary" style="margin-top:12px;">
+        OK
+      </button>
+    `;
+
+    document.getElementById("event-zone").innerHTML = html;
+
+    document.getElementById("btn-incident-ok").addEventListener("click", () => {
+      if (inc.type === "player") {
+        target.incidentActif = true;
+        target.incidentLabel = inc.label;
+
+        if (inc.duration === "1-pinte") {
+          target.incidentExpirePinte = state.numeroPinte;
+        }
+        if (inc.duration === "5-min") {
+          target.incidentExpireTimestamp = nowSeconds() + 300;
+        }
+      }
+
+      if (inc.type === "all") {
+        state.joueurs.forEach((j) => {
+          j.incidentActif = true;
+          j.incidentLabel = inc.label;
+
+          if (inc.duration === "1-pinte") {
+            j.incidentExpirePinte = state.numeroPinte;
+          }
+          if (inc.duration === "5-min") {
+            j.incidentExpireTimestamp = nowSeconds() + 300;
+          }
+        });
+      }
+
+      renderPlayers();
+
+      incidentActif = false;
+      incidentData = null;
+
+      setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini ».");
+    });
+  }
+
+  function cleanExpiredIncidents() {
+    const now = nowSeconds();
+
+    state.joueurs.forEach((j) => {
+      if (j.incidentExpirePinte !== null) {
+        if (j.incidentExpirePinte < state.numeroPinte) {
+          j.incidentActif = false;
+          j.incidentLabel = null;
+          j.incidentExpirePinte = null;
+        }
+      }
+
+      if (j.incidentExpireTimestamp !== null) {
+        if (now >= j.incidentExpireTimestamp) {
+          j.incidentActif = false;
+          j.incidentLabel = null;
+          j.incidentExpireTimestamp = null;
+        }
+      }
+    });
+  }
+
+  async function createRoom() {
+    if (!supabaseClient) return null;
+
+    try {
+      await ensureSignedIn();
+    } catch (error) {
+      showSupabaseError("Connexion impossible. Vérifiez l'URL et la clé anon.");
+      return null;
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const code = generateRoomCode(6);
+
+      const { data: rpcData, error: rpcError } = await supabaseClient.rpc("create_room", {
+        p_code: code,
+        p_duree_minutes: state.dureeMinutes,
+        p_difficulte: state.difficulte,
+        p_display_name: "Host"
+      });
+
+      if (!rpcError && rpcData) {
+        state.dataMode = "pinte_finishes";
+        return { id: rpcData, code };
+      }
+
+      if (rpcError) {
+        showSupabaseError(
+          `Erreur RPC create_room: ${rpcError.message || "inconnue"}. Vérifiez vos policies/auth.`
+        );
+        return null;
+      }
+
+      const { data, error } = await supabaseClient
+        .from("rooms")
+        .insert({ code })
+        .select("id, code")
+        .single();
+
+      if (!error && data) {
+        state.dataMode = "events";
+        return data;
+      }
+    }
+
+    return null;
+  }
+
+  function updateRoomCodeUI(code) {
+    if (elRoomCodeValue) {
+      elRoomCodeValue.textContent = code || "—";
+    }
+  }
+
+  async function setupHostRoom() {
+    if (!supabaseClient) {
+      elSupabaseWarning.style.display = "block";
+      updateRoomCodeUI("OFFLINE");
+      return;
+    }
+
+    elSupabaseWarning.style.display = "none";
+    if (elSupabaseStatus) {
+      elSupabaseStatus.style.display = "none";
+      elSupabaseStatus.textContent = "";
+    }
+    let room = null;
+    room = await createRoom();
+
+    if (!room) {
+      updateRoomCodeUI("ERR");
+      showSupabaseError(
+        "Impossible de créer la salle. Vérifiez l'URL/clé, les policies RLS et que l'auth anonyme est activée."
+      );
+      return;
+    }
+
+    state.roomId = room.id;
+    state.roomCode = room.code;
+    updateRoomCodeUI(room.code);
+
+    subscribeToRoom();
+  }
+
+  async function fetchProfileName(userId) {
+    if (!supabaseClient || !userId) return null;
+    if (state.memberNameCache.has(userId)) return state.memberNameCache.get(userId);
+
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) return null;
+    state.memberNameCache.set(userId, data.display_name);
+    return data.display_name;
+  }
+
+  function subscribeToRoom() {
+    if (!supabaseClient || !state.roomId) return;
+
+    if (state.roomSubscription) {
+      supabaseClient.removeChannel(state.roomSubscription);
+    }
+
+    const channel = supabaseClient
+      .channel(`room-${state.roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: state.dataMode === "pinte_finishes" ? "pinte_finishes" : "events",
+          filter: `room_id=eq.${state.roomId}`
+        },
+        async (payload) => {
+          if (!payload.new) return;
+          if (state.dataMode === "events" && payload.new.type !== "finish") return;
+
+          let playerName = "";
+          if (state.dataMode === "events") {
+            playerName = payload.new.payload?.playerName || "";
+          } else {
+            playerName = await fetchProfileName(payload.new.user_id);
+          }
+
+          const normalized = (playerName || "").trim().toLowerCase();
+          if (!normalized) return;
+
+          const joueur = state.joueurs.find((j) => j.nom.toLowerCase() === normalized);
+          if (!joueur) {
+            setEventZone("Signal joueur inconnu", `${playerName} n'existe pas dans la liste.`);
+            return;
+          }
+
+          handlePlayerFinish(joueur.id);
+        }
+      )
+      .subscribe();
+
+    state.roomSubscription = channel;
+  }
+
+  async function joinRoomAsPlayer() {
+    if (!supabaseClient) {
+      elPlayerStatus.textContent = "Supabase non configuré. Mode Player indisponible.";
+      return;
+    }
+
+    const code = elPlayerRoomCode.value.trim().toUpperCase();
+    const name = elPlayerName.value.trim();
+
+    if (!code) {
+      elPlayerStatus.textContent = "Merci de saisir un code de salle valide.";
+      return;
+    }
+    if (!name) {
+      elPlayerStatus.textContent = "Merci de saisir ton prénom.";
+      return;
+    }
+
+    elPlayerStatus.textContent = "Connexion à la salle...";
+
+    try {
+      await ensureSignedIn();
+    } catch (error) {
+      elPlayerStatus.textContent = "Connexion Supabase impossible.";
+      return;
+    }
+
+    const { data: rpcData, error: rpcError } = await supabaseClient.rpc("join_room", {
+      p_code: code,
+      p_display_name: name
+    });
+
+    if (!rpcError && rpcData) {
+      state.roomId = rpcData;
+      state.roomCode = code;
+      state.dataMode = "pinte_finishes";
+      elPlayerStatus.textContent = `Salle ${code} rejointe.`;
+    } else {
+      const { data, error } = await supabaseClient
+        .from("rooms")
+        .select("id, code")
+        .eq("code", code)
+        .single();
+
+      if (error || !data) {
+        elPlayerStatus.textContent = "Code invalide ou salle introuvable.";
         return;
       }
 
-      let html = '<div style="margin-top:4px;">';
-      rawNames.forEach((name, idx) => {
-        const idSelect = `team-assign-${idx}`;
-        html += `
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-            <span>${name}</span>
-            <select id="${idSelect}" class="form-select" style="max-width:150px;">
-              <option value="">Aucune équipe</option>
-              <option value="1">Équipe 1</option>
-              <option value="2">Équipe 2</option>
-            </select>
-          </div>
-        `;
+      state.roomId = data.id;
+      state.roomCode = data.code;
+      state.dataMode = "events";
+      elPlayerStatus.textContent = `Salle ${data.code} rejointe.`;
+    }
+
+    elBtnPlayerJoin.disabled = true;
+    elBtnPlayerFinish.style.display = "block";
+  }
+
+  async function sendFinishEvent() {
+    if (!supabaseClient || !state.roomId) {
+      elPlayerStatus.textContent = "Impossible d'envoyer l'événement.";
+      return;
+    }
+
+    const name = elPlayerName.value.trim();
+    if (!name) {
+      elPlayerStatus.textContent = "Merci de saisir ton prénom.";
+      return;
+    }
+
+    let error = null;
+
+    if (state.dataMode === "pinte_finishes") {
+      const { data: roomData } = await supabaseClient
+        .from("rooms")
+        .select("pint_no")
+        .eq("id", state.roomId)
+        .single();
+      const pintNo = roomData?.pint_no || 1;
+
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+      const { error: insertError } = await supabaseClient.from("pinte_finishes").insert({
+        room_id: state.roomId,
+        pint_no: pintNo,
+        user_id: userId
       });
-      html += '</div>';
-
-      elTeamsAssignment.innerHTML = html;
+      error = insertError;
+    } else {
+      const { error: insertError } = await supabaseClient.from("events").insert({
+        room_id: state.roomId,
+        type: "finish",
+        payload: { playerName: name }
+      });
+      error = insertError;
     }
 
+    if (error) {
+      elPlayerStatus.textContent = "Erreur Supabase, réessaie.";
+      return;
+    }
 
-function computeOccurrences(dureeMinutes, difficulte) {
-  const H = dureeMinutes / 60; // durée en heures
-  let sprints, cotes, echappees, incidents;
-
-  if (difficulte === "Ville") {
-    sprints    = 1 * H;
-    cotes      = Math.max(1, Math.round(0.5 * H));
-    echappees  = Math.round(1.5 * H);
-    incidents  = 2 * H;
-  } else if (difficulte === "Plaine") {
-    sprints    = 2 * H;
-    cotes      = 1 * H;
-    echappees  = 3 * H;
-    incidents  = 4 * H;
-  } else if (difficulte === "Montagne") {
-    sprints    = 3 * H;
-    cotes      = 2 * H;
-    echappees  = 4 * H;
-    incidents  = 6 * H;
-  } else {
-    // fallback Plaine
-    sprints    = 2 * H;
-    cotes      = 1 * H;
-    echappees  = 3 * H;
-    incidents  = 4 * H;
+    elPlayerStatus.textContent = "Arrivée envoyée !";
   }
 
-  return {
-    sprints:   Math.max(1, Math.round(sprints)),
-    cotes:     Math.max(1, Math.round(cotes)),
-    echappees: Math.max(1, Math.round(echappees)),
-    incidents: Math.max(1, Math.round(incidents))
-  };
-}
+  document.getElementById("btn-sprint").addEventListener("click", () => {
+    if (sprintActif) {
+      setEventZone("Sprint impossible", "Un sprint est déjà en cours !");
+      return;
+    }
 
+    const now = nowSeconds();
+    if (now < sprintCooldown) {
+      const remaining = Math.ceil(sprintCooldown - now);
+      setEventZone("Sprint refusé", `Il faut encore attendre ${remaining} secondes avant de relancer un sprint.`);
+      return;
+    }
 
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+    const noms = state.joueurs.map((j) => j.nom).join("\n");
+    const who = prompt("Qui lance le sprint ?\n\n" + noms);
 
-function buildTimeline(dureeMinutes, occurrences) {
-  const totalSeconds = dureeMinutes * 60;
-  const events = [];
+    if (!who) return;
 
-  // Construction de la liste brute
-  for (let i = 0; i < occurrences.sprints; i++)   events.push("SPRINT");
-  for (let i = 0; i < occurrences.cotes; i++)     events.push("COTE");
-  for (let i = 0; i < occurrences.echappees; i++) events.push("ECHAPPEE");
-  for (let i = 0; i < occurrences.incidents; i++) events.push("INCIDENT");
+    const lanceur = state.joueurs.find((j) => j.nom.toLowerCase() === who.toLowerCase());
+    if (!lanceur) {
+      setEventZone("Erreur", "Nom introuvable.");
+      return;
+    }
 
-  if (events.length === 0) return [];
+    if (!lanceur.sprintsLances) lanceur.sprintsLances = 0;
+    if (lanceur.sprintsLances >= 2) {
+      setEventZone("Sprint refusé", `${lanceur.nom} a déjà lancé 2 sprints.`);
+      return;
+    }
 
-  // Mélange
-  const shuffled = shuffleArray(events);
-  const N = shuffled.length;
-  const slotSize = totalSeconds / N;
+    lanceur.sprintsLances += 1;
+    sprintLanceur = lanceur.id;
+    sprintActif = true;
 
-  const timeline = [];
+    renderSprintInterface();
+  });
 
-  for (let i = 0; i < N; i++) {
-    const base = i * slotSize;
-    const t = base + Math.random() * slotSize; // temps aléatoire dans le slot
-    timeline.push({
-      timeOffset: t,     // secondes depuis le début du Tour
-      type: shuffled[i],
-      fired: false
+  document.getElementById("btn-cote").addEventListener("click", () => {
+    if (coteActive) {
+      setEventZone("Côte impossible", "Une côte est déjà en cours !");
+      return;
+    }
+
+    coteCible = Math.floor(20 + Math.random() * 60);
+    coteActive = true;
+
+    renderCoteInterface();
+  });
+
+  document.getElementById("btn-echappee").addEventListener("click", () => {
+    if (echappeeActive) {
+      setEventZone("Échappée impossible", "Une échappée est déjà en cours !");
+      return;
+    }
+
+    echappeeActive = true;
+    echappeeClics = [];
+
+    renderEchappeeInterface();
+  });
+
+  document.getElementById("btn-incident").addEventListener("click", () => {
+    if (incidentActif) {
+      setEventZone("Incident en cours", "Veuillez terminer l'incident actuel avant d'en tirer un autre.");
+      return;
+    }
+
+    const incident = incidentsList[Math.floor(Math.random() * incidentsList.length)];
+    incidentActif = true;
+    incidentData = incident;
+
+    renderIncidentInterface();
+  });
+
+  if (elTeamsEnabled) {
+    elTeamsEnabled.addEventListener("change", () => {
+      if (elTeamsEnabled.checked) {
+        elTeamsSetup.style.display = "block";
+        refreshTeamsAssignmentUI();
+      } else {
+        elTeamsSetup.style.display = "none";
+        elTeamsAssignment.innerHTML = "";
+      }
     });
   }
 
-  // Tri par temps (sécurité)
-  timeline.sort((a, b) => a.timeOffset - b.timeOffset);
-
-  return timeline;
-}
-
-function describeEventType(type) {
-  if (type === "SPRINT")   return "Sprint (maillot vert)";
-  if (type === "COTE")     return "Côte (maillot à pois)";
-  if (type === "ECHAPPEE") return "Échappée (maillot blanc)";
-  if (type === "INCIDENT") return "Incident de course";
-  return type;
-}
-
-function updateNextEventLabel() {
-  if (!elNextEvent) return;
-
-  if (!state.timelineEvents || state.timelineEvents.length === 0 || !state.tourStartTimestamp) {
-    elNextEvent.textContent = "Prochain événement : aucun";
-    return;
-  }
-
-  const now = nowSeconds();
-  const elapsed = now - state.tourStartTimestamp;
-
-  const next = state.timelineEvents.find(ev => !ev.fired && ev.timeOffset > elapsed);
-
-  if (!next) {
-    elNextEvent.textContent = "Prochain événement : aucun (fin du Tour)";
-    return;
-  }
-
-  const secondsToGo = Math.max(0, Math.round(next.timeOffset - elapsed));
-  const minutes = Math.floor(secondsToGo / 60);
-  const secs    = secondsToGo % 60;
-
-  const tStr = minutes > 0
-    ? `${minutes} min ${secs.toString().padStart(2,"0")} s`
-    : `${secs} s`;
-
-  elNextEvent.textContent =
-    `Prochain événement : ${describeEventType(next.type)} dans ${tStr}`;
-}
-
-function checkTimelineEvents() {
-  if (!state.timelineEvents || state.timelineEvents.length === 0 || !state.tourStartTimestamp) {
-    return;
-  }
-
-  const now = nowSeconds();
-  const elapsed = now - state.tourStartTimestamp;
-
-   state.timelineEvents.forEach(ev => {
-    if (!ev.fired && ev.timeOffset <= elapsed) {
-      ev.fired = true;
-
-      console.log(
-        "Événement déclenché par la timeline :",
-        ev.type,
-        "à t =",
-        Math.round(ev.timeOffset),
-        "s"
-      );
-
-      // Dispatch selon le type d'événement
-      if (ev.type === "SPRINT") {
-        if (!sprintActif) {
-          sprintActif = true;
-          sprintLanceur = null;      // sprint auto, pas de lanceur
-          renderSprintInterface();
-        }
-      }
-      else if (ev.type === "COTE") {
-        if (!coteActive) {
-          coteActive = true;
-          coteCible = Math.floor(20 + Math.random() * 60); // 20–80 %
-          renderCoteInterface();
-        }
-      }
-      else if (ev.type === "ECHAPPEE") {
-        if (!echappeeActive) {
-          echappeeActive = true;
-          echappeeClics = [];
-          renderEchappeeInterface();
-        }
-      }
-      else if (ev.type === "INCIDENT") {
-        if (!incidentActif) {
-          incidentActif = true;
-          incidentData = incidentsList[Math.floor(Math.random() * incidentsList.length)];
-          renderIncidentInterface();
-        }
-      }
-    }
-  });
-
-  // Nettoyage des incidents qui ont expiré
-  cleanExpiredIncidents();
-}
-
-function isAnyEventActive() {
-  return sprintActif || coteActive || echappeeActive || incidentActif;
-}
-
-
-
-// ======== CLASSEMENTS ========
-function ouvrirClassements() {
-  if (state.joueurs.length === 0) {
-
-
-
-
-    elClassementContent.innerHTML = "<p>Aucun joueur pour l'instant.</p>";
-    elClassementModal.style.display = "flex";
-    return;
-  }
-
-  const now = nowSeconds();
-  const elapsed = now - state.tourStartTimestamp;
-
-  state.timelineEvents.forEach(ev => {
-    if (!ev.fired && ev.timeOffset <= elapsed) {
-      ev.fired = true;
-      console.log("Événement déclenché :", ev.type, "à t =", Math.round(ev.timeOffset), "s");
-      // Ici plus tard : on appellera la bonne fonction selon ev.type
-      // ex: startSprintAuto(), startCoteAuto(), startEchappeeAuto(), triggerRandomIncident();
-    }
-  });
-
-
-  // Copie des joueurs
-  const joueurs = [...state.joueurs];
-
-  // Maillot Jaune (temps cumulé croissant)
-  const jaune = [...joueurs].sort((a,b)=>a.tempsCumulé - b.tempsCumulé);
-  const leaderJaune = jaune[0].tempsCumulé;
-
-  // Maillot Vert (points verts décroissants)
-  const vert = [...joueurs].sort((a,b)=>b.pointsVert - a.pointsVert);
-
-  // Maillot à Pois (points pois décroissants)
-  const pois = [...joueurs].sort((a,b)=>b.pointsPois - a.pointsPois);
-
-  // Maillot Blanc (points blancs décroissants)
-  const blanc = [...joueurs].sort((a,b)=>b.pointsBlanc - a.pointsBlanc);
-
-  let html = "";
-
-  // Section Maillot Jaune
-  html += `<h3 style="margin:6px 0;">🟡 Maillot Jaune</h3>`;
-  html += `<ul style="list-style:none; padding-left:0; margin:0 0 8px 0;">`;
-  jaune.slice(0,3).forEach((j,idx) => {
-    const delta = j.tempsCumulé - leaderJaune;
-    const deltaStr = idx === 0 ? "leader" : formatDeltaSeconds(delta);
-    html += `<li>${idx+1}. <b>${j.nom}</b> – ${deltaStr}</li>`;
-  });
-  html += `</ul>`;
-
-  // Section Maillot Vert
-  html += `<h3 style="margin:6px 0;">🟢 Maillot Vert</h3>`;
-  html += `<ul style="list-style:none; padding-left:0; margin:0 0 8px 0;">`;
-  vert.slice(0,3).forEach((j,idx) => {
-  html += `<li>${idx+1}. <b>${j.nom}</b> – ${j.pointsVert} pts</li>`;
-  });
-  html += `</ul>`;
-
-  // Section Maillot à Pois
-  html += `<h3 style="margin:6px 0;">🔴 Maillot à Pois</h3>`;
-  html += `<ul style="list-style:none; padding-left:0; margin:0 0 8px 0;">`;
-  pois.slice(0,3).forEach((j,idx) => {
-    html += `<li>${idx+1}. <b>${j.nom}</b> – ${j.pointsPois} pts</li>`;
-  });
-  html += `</ul>`;
-
-  // Section Maillot Blanc
-  html += `<h3 style="margin:6px 0;">⚪ Maillot Blanc</h3>`;
-  html += `<ul style="list-style:none; padding-left:0; margin:0;">`;
-  blanc.slice(0,3).forEach((j,idx) => {
-    html += `<li>${idx+1}. <b>${j.nom}</b> – ${j.pointsBlanc} pts</li>`;
-  });
-  html += `</ul>`;
-
-  elClassementContent.innerHTML = html;
-  elClassementModal.style.display = "flex";
-}
-
-
-    // ======== INITIALISATION ========
-
-document.getElementById("btn-sprint").addEventListener("click", () => {
-  if (sprintActif) {
-    setEventZone("Sprint impossible", "Un sprint est déjà en cours !");
-    return;
-  }
-
-  const now = nowSeconds();
-  if (now < sprintCooldown) {
-    const remaining = Math.ceil(sprintCooldown - now);
-    setEventZone("Sprint refusé", `Il faut encore attendre ${remaining} secondes avant de relancer un sprint.`);
-    return;
-  }
-
-  const noms = state.joueurs.map(j => j.nom).join("\n");
-  const who = prompt("Qui lance le sprint ?\n\n" + noms);
-
-  if (!who) return;
-
-  const lanceur = state.joueurs.find(j => j.nom.toLowerCase() === who.toLowerCase());
-  if (!lanceur) {
-    setEventZone("Erreur", "Nom introuvable.");
-    return;
-  }
-
-  if (!lanceur.sprintsLances) lanceur.sprintsLances = 0;
-  if (lanceur.sprintsLances >= 2) {
-    setEventZone("Sprint refusé", `${lanceur.nom} a déjà lancé 2 sprints.`);
-    return;
-  }
-
-  lanceur.sprintsLances += 1;
-  sprintLanceur = lanceur.id;
-  sprintActif = true;
-
-  renderSprintInterface();
-});
-
-document.getElementById("btn-cote").addEventListener("click", () => {
-  if (coteActive) {
-    setEventZone("Côte impossible", "Une côte est déjà en cours !");
-    return;
-  }
-
-  coteCible = Math.floor(20 + Math.random() * 60);
-  coteActive = true;
-
-  renderCoteInterface();
-});
-
-document.getElementById("btn-echappee").addEventListener("click", () => {
-  if (echappeeActive) {
-    setEventZone("Échappée impossible", "Une échappée est déjà en cours !");
-    return;
-  }
-
-  echappeeActive = true;
-  echappeeClics = [];
-
-  renderEchappeeInterface();
-});
-
-document.getElementById("btn-incident").addEventListener("click", () => {
-  if (incidentActif) {
-    setEventZone("Incident en cours", "Veuillez terminer l'incident actuel avant d'en tirer un autre.");
-    return;
-  }
-
-  const incident = incidentsList[Math.floor(Math.random() * incidentsList.length)];
-  incidentActif = true;
-  incidentData = incident;
-
-  renderIncidentInterface();
-});
-    const elTimer = document.getElementById("timer");
-    const elNextEvent = document.getElementById("next-event");
-    const elPlayersCard = document.getElementById("players-card");
-    const elEventZone = document.getElementById("event-zone");
-    const elSetupModal = document.getElementById("setup-modal");
-    const elDuration = document.getElementById("tour-duration");
-    const elPlayersInput = document.getElementById("players-input");
-    const elSetupError = document.getElementById("setup-error");
-    const elBtnStart = document.getElementById("btn-start");
-    const elBtnDemo = document.getElementById("btn-demo");
-    const elClassementModal = document.getElementById("classement-modal");
-    const elClassementContent = document.getElementById("classement-content");
-    const elBtnClassementClose = document.getElementById("btn-classement-close");
-    const elBtnSettings = document.getElementById("btn-settings");
-    const elTeamsCard   = document.getElementById("teams-card");   // <--- AJOUT
-
-    // Équipes - éléments setup
-    const elTeamsEnabled    = document.getElementById("teams-enabled");
-    const elTeam1Name       = document.getElementById("team1-name");
-    const elTeam1Tag        = document.getElementById("team1-tag");
-    const elTeam1Color      = document.getElementById("team1-color");
-    const elTeam2Name       = document.getElementById("team2-name");
-    const elTeam2Tag        = document.getElementById("team2-tag");
-    const elTeam2Color      = document.getElementById("team2-color");
-    const elTeamsAssignment = document.getElementById("teams-assignment");
-    const elBtnRefreshTeams = document.getElementById("btn-refresh-teams");
-const elTeamsSetup       = document.getElementById("teams-setup");
-
-
-// Bouton ⚙ = ouvre la modale de classements
-if (elBtnSettings) {
-  elBtnSettings.addEventListener("click", () => {
-    ouvrirClassements();
-  });
-}
-
-// Bouton "Fermer" de la modale de classements
-if (elBtnClassementClose) {
-  elBtnClassementClose.addEventListener("click", () => {
-    elClassementModal.style.display = "none";
-  });
-}
-
-
-// SONS
-const sndSprint   = document.getElementById("snd-sprint");
-const sndCote     = document.getElementById("snd-cote");
-const sndEchappee = document.getElementById("snd-echappee");
-const sndIncident = document.getElementById("snd-incident");
-
-// Afficher / cacher la zone équipes
-if (elTeamsEnabled) {
-  elTeamsEnabled.addEventListener("change", () => {
-    if (elTeamsEnabled.checked) {
-      elTeamsSetup.style.display = "block";
+  if (elBtnRefreshTeams) {
+    elBtnRefreshTeams.addEventListener("click", () => {
       refreshTeamsAssignmentUI();
-    } else {
-      elTeamsSetup.style.display = "none";
-      elTeamsAssignment.innerHTML = "";
-    }
-  });
-}
-
-// Générer l’UI des joueurs
-if (elBtnRefreshTeams) {
-  elBtnRefreshTeams.addEventListener("click", () => {
-    refreshTeamsAssignmentUI();
-  });
-}
-
-
-function playSound(type) {
-  let audio = null;
-  if (type === "SPRINT")   audio = sndSprint;
-  if (type === "COTE")     audio = sndCote;
-  if (type === "ECHAPPEE") audio = sndEchappee;
-  if (type === "INCIDENT") audio = sndIncident;
-
-  if (audio) {
-    // remet à zéro pour pouvoir rejouer même si le son est court
-    audio.currentTime = 0;
-    audio.play().catch(()=>{ /* on ignore les erreurs d'autoplay */ });
-  }
-}
-
-const elCoverScreen  = document.getElementById("cover-screen");
-const elCoverStart   = document.getElementById("btn-cover-start");
-const elProfilRadios = document.querySelectorAll('input[name="profil-etape"]');
-const elMainContent = document.getElementById("main-content");
-
-console.log("INIT COVER", elCoverScreen, elCoverStart);
-
-function tryRestoreGameOnLoad() {
-  let raw = null;
-  try {
-    raw = localStorage.getItem(SAVE_KEY);
-  } catch (e) {
-    console.error("Impossible de lire la sauvegarde :", e);
-    return;
-  }
-
-  if (!raw) return;
-
-  let payload;
-  try {
-    payload = JSON.parse(raw);
-  } catch (e) {
-    console.error("Sauvegarde corrompue :", e);
-    return;
-  }
-
-  if (!payload || !payload.state) return;
-
-  const confirmResume = window.confirm(
-    "Une partie Tibo Pinart sauvegardée a été trouvée.\n\nVoulez-vous la reprendre ?"
-  );
-  if (!confirmResume) return;
-
-  const s = payload.state;
-
-  // On recopie l'état
-  state.joueurs           = s.joueurs || [];
-  state.dureeMinutes      = s.dureeMinutes || 180;
-  state.tourFinTimestamp  = s.tourFinTimestamp;
-  state.tourStartTimestamp= s.tourStartTimestamp;
-  state.pinteEnCours      = s.pinteEnCours;
-  state.finPinteOrdre     = s.finPinteOrdre || [];
-  state.numeroPinte       = s.numeroPinte || 1;
-  state.difficulte        = s.difficulte || "Plaine";
-  state.timelineEvents    = s.timelineEvents || [];
-  state.teams             = s.teams || [];
-  // Normalisation des champs SAGAN pour les anciennes sauvegardes
-  state.joueurs.forEach(j => {
-    if (typeof j.isSagan === "undefined") j.isSagan = false;
-    if (typeof j.saganExpireTimestamp === "undefined") j.saganExpireTimestamp = null;
-    if (typeof j.sprintsWonConsecutifs === "undefined") j.sprintsWonConsecutifs = 0;
-  });
-
-
-  // On masque la jaquette et le setup, on affiche le jeu
-  if (elCoverScreen) elCoverScreen.style.display = "none";
-  if (elSetupModal)  elSetupModal.style.display  = "none";
-  if (elMainContent) elMainContent.style.display = "block";
-
-  // On relance le timer si le Tour n'est pas déjà fini
-  if (state.tourFinTimestamp) {
-    const remaining = Math.floor(state.tourFinTimestamp - nowSeconds());
-    if (remaining > 0) {
-      elTimer.textContent = formatTimeHMS(remaining);
-      if (state.timerInterval) clearInterval(state.timerInterval);
-      state.timerInterval = setInterval(tickTimer, 1000);
-    } else {
-      elTimer.textContent = "00:00:00";
-      endTour();
-    }
-  }
-
-  // On rerend l’UI
-  renderPlayers();
-  renderTeams();
-  updateNextEventLabel();
-  setEventZone(
-    "Partie reprise",
-    "Le Tour a repris là où il avait été sauvegardé."
-  );
-}
-
-
-if (elCoverScreen && elCoverStart) {
-  // Afficher la jaquette au chargement
-  elCoverScreen.style.display = "flex";
-  elCoverScreen.style.opacity = "1";
-
-  elCoverStart.addEventListener("click", () => {
-    console.log("CLICK COVER START");
-
-    // 1) Lecture de la difficulté
-    let difficulte = "Plaine";
-    elProfilRadios.forEach(r => {
-      if (r.checked) difficulte = r.value;
     });
-    state.difficulte = difficulte;
+  }
 
-    // 2) Calcul des occurrences et timeline
+  elBtnDemo.addEventListener("click", () => {
+    elPlayersInput.value = "Louis\nEloi\nGabriel\nLoïc\nMax";
+    elSetupError.textContent = "";
+    if (elTeamsEnabled && elTeamsEnabled.checked) {
+      refreshTeamsAssignmentUI();
+    }
+  });
+
+  elBtnStart.addEventListener("click", () => {
+    const minutes = parseInt(elDuration.value, 10);
+    const rawNames = elPlayersInput.value
+      .split("\n")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    const selectedProfile = document.querySelector('input[name="profil-etape"]:checked');
+    state.difficulte = selectedProfile ? selectedProfile.value : "Plaine";
+
+    const teamsEnabled = elTeamsEnabled && elTeamsEnabled.checked;
+    state.teams = [];
+
+    if (teamsEnabled) {
+      const name1 = (elTeam1Name.value || "").trim() || "Équipe 1";
+      const tag1 = ((elTeam1Tag.value || "").trim() || "EQ1").toUpperCase();
+      const color1 = elTeam1Color.value || "#FFD600";
+
+      const name2 = (elTeam2Name.value || "").trim() || "Équipe 2";
+      const tag2 = ((elTeam2Tag.value || "").trim() || "EQ2").toUpperCase();
+      const color2 = elTeam2Color.value || "#00AEEF";
+
+      state.teams = [
+        { id: 1, name: name1, tag: tag1, color: color1 },
+        { id: 2, name: name2, tag: tag2, color: color2 }
+      ];
+    }
+
+    if (rawNames.length < 2) {
+      elSetupError.textContent = "Il faut au moins 2 joueurs pour lancer le Tour.";
+      return;
+    }
+    if (rawNames.length > 10) {
+      elSetupError.textContent = "Maximum 10 joueurs.";
+      return;
+    }
+
+    state.joueurs = rawNames.map((nom, idx) => {
+      let equipeId = null;
+
+      if (teamsEnabled && state.teams.length > 0) {
+        const select = document.getElementById(`team-assign-${idx}`);
+        if (select && select.value) {
+          const val = parseInt(select.value, 10);
+          if (!isNaN(val)) {
+            equipeId = val;
+          }
+        }
+      }
+
+      return {
+        id: idx + 1,
+        nom,
+        tempsCumulé: 0,
+        pointsVert: 0,
+        pointsPois: 0,
+        pointsBlanc: 0,
+        incidentActif: false,
+        incidentLabel: null,
+        incidentExpirePinte: null,
+        incidentExpireTimestamp: null,
+        aFiniCettePinte: false,
+        equipeId: equipeId
+      };
+    });
+
+    state.dureeMinutes = minutes;
+    state.tourStartTimestamp = nowSeconds();
+    state.tourFinTimestamp = state.tourStartTimestamp + minutes * 60;
+    state.pinteEnCours = true;
+    state.finPinteOrdre = [];
+    state.numeroPinte = 1;
+
     const occ = computeOccurrences(state.dureeMinutes, state.difficulte);
     state.timelineEvents = buildTimeline(state.dureeMinutes, occ);
 
-    // 3) Marquer le début du Tour
-    state.tourStartTimestamp = nowSeconds();
+    if (state.timerInterval) {
+      clearInterval(state.timerInterval);
+    }
+    state.timerInterval = setInterval(tickTimer, 1000);
+    tickTimer();
 
-    // 4) Mettre à jour "Prochain événement"
-    updateNextEventLabel();
-	if (elMainContent) {
-    elMainContent.style.display = "block";
-  	}
-    // Debug
-    console.log("Profil:", state.difficulte, "Durée:", state.dureeMinutes, "min");
-    console.log("Occurrences:", occ);
-    console.table(state.timelineEvents);
+    elSetupModal.style.display = "none";
+    renderPlayers();
+    setEventZone(
+      "Tour lancé",
+      "La première pinte est en cours. Appuie sur « Fini » quand un joueur termine sa pinte pour mettre à jour le Maillot Jaune."
+    );
 
-    // 5) Faire disparaître la jaquette
+    if (supabaseClient && state.roomId && state.dataMode === "pinte_finishes") {
+      supabaseClient.from("rooms").update({
+        status: "live",
+        tour_start: new Date().toISOString(),
+        duree_minutes: state.dureeMinutes,
+        difficulte: state.difficulte,
+        pint_no: state.numeroPinte
+      }).eq("id", state.roomId);
+    }
+  });
+
+  elBtnSettings.addEventListener("click", () => {
+    ouvrirClassements();
+  });
+
+  elBtnClassementClose.addEventListener("click", () => {
+    elClassementModal.style.display = "none";
+  });
+
+  elCopyRoom.addEventListener("click", async () => {
+    if (!state.roomCode) return;
+    try {
+      await navigator.clipboard.writeText(state.roomCode);
+      elCopyRoom.textContent = "Copié";
+      setTimeout(() => {
+        elCopyRoom.textContent = "Copier";
+      }, 1200);
+    } catch (error) {
+      setEventZone("Copie impossible", "Impossible de copier automatiquement le code salle.");
+    }
+  });
+
+  elBtnModeHost.addEventListener("click", async () => {
     elCoverScreen.style.opacity = "0";
     setTimeout(() => {
       elCoverScreen.style.display = "none";
     }, 400);
-  });
-} else {
-  console.warn("cover-screen ou btn-cover-start introuvable");
-}
 
-    elBtnDemo.addEventListener("click", () => {
-      elPlayersInput.value = "Louis\nEloi\nGabriel\nLoïc\nMax";
-      elSetupError.textContent = "";
-      if (elTeamsEnabled && elTeamsEnabled.checked) {
-        refreshTeamsAssignmentUI();
-      }
-    });
+    elMainContent.style.display = "block";
+    elPlayerContent.style.display = "none";
 
-
-
-    elBtnStart.addEventListener("click", () => {
-      const minutes = parseInt(elDuration.value, 10);
-      const rawNames = elPlayersInput.value
-        .split("\n")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      // Lecture du mode équipes
-      const teamsEnabled = elTeamsEnabled && elTeamsEnabled.checked;
-      state.teams = [];
-
-      if (teamsEnabled) {
-        const name1  = (elTeam1Name.value || "").trim()  || "Équipe 1";
-        const tag1   = ((elTeam1Tag.value || "").trim()  || "EQ1").toUpperCase();
-        const color1 = elTeam1Color.value || "#FFD600";
-
-        const name2  = (elTeam2Name.value || "").trim()  || "Équipe 2";
-        const tag2   = ((elTeam2Tag.value || "").trim()  || "EQ2").toUpperCase();
-        const color2 = elTeam2Color.value || "#00AEEF";
-
-        state.teams = [
-          { id: 1, name: name1, tag: tag1, color: color1 },
-          { id: 2, name: name2, tag: tag2, color: color2 }
-        ];
-      }
-
-
-
-if (elBtnRefreshTeams) {
-  elBtnRefreshTeams.addEventListener("click", () => {
-    if (!elTeamsAssignment) return;
-
-    // Si le mode équipes n'est pas coché, on l'active automatiquement
-    if (elTeamsEnabled && !elTeamsEnabled.checked) {
-      elTeamsEnabled.checked = true;
-    }
-
-    // Génère l’UI d’affectation équipes ↔ joueurs
-    refreshTeamsAssignmentUI();
-  });
-}
-
-
-
-      if (rawNames.length < 2) {
-        elSetupError.textContent = "Il faut au moins 2 joueurs pour lancer le Tour.";
-        return;
-      }
-      if (rawNames.length > 10) {
-        elSetupError.textContent = "Maximum 10 joueurs.";
-        return;
-      }
-
-      state.joueurs = rawNames.map((nom, idx) => {
-        let equipeId = null;
-
-        if (teamsEnabled && state.teams.length > 0) {
-          const select = document.getElementById(`team-assign-${idx}`);
-          if (select && select.value) {
-            const val = parseInt(select.value, 10);
-            if (!isNaN(val)) {
-              equipeId = val; // 1 ou 2
-            }
-          }
-        }
-
-        return {
-          id: idx + 1,
-          nom,
-          tempsCumulé: 0,
-          pointsVert: 0,
-          pointsPois: 0,
-          pointsBlanc: 0,
-
-          incidentActif: false,
-          incidentLabel: null,
-
-          incidentExpirePinte: null,
-          incidentExpireTimestamp: null,
-
-          aFiniCettePinte: false,
-
-          equipeId: equipeId,
-
-          // ---- CHAMPS SAGAN ----
-          isSagan: false,
-          saganExpireTimestamp: null,
-          sprintsWonConsecutifs: 0
-        };
-      });
-
-
-
-      state.dureeMinutes = minutes;
-      state.tourFinTimestamp = nowSeconds() + minutes * 60;
-      state.pinteEnCours = true;
-      state.finPinteOrdre = [];
-
-      // démarrer timer
-      if (state.timerInterval) {
-        clearInterval(state.timerInterval);
-      }
-      state.timerInterval = setInterval(tickTimer, 1000);
-      tickTimer();
-
-      elSetupModal.style.display = "none";
-      renderPlayers();
-      setEventZone(
-        "Tour lancé",
-        "La première pinte est en cours. Appuie sur « Fini » quand un joueur termine sa pinte pour mettre à jour le Maillot Jaune."
-      );
-      saveGame();
-
-    });
-
-    function tickTimer() {
-  const remaining = Math.floor(state.tourFinTimestamp - nowSeconds());
-  elTimer.textContent = formatTimeHMS(remaining);
-
-  if (remaining <= 0) {
-    clearInterval(state.timerInterval);
-    elTimer.textContent = "00:00:00";
-    endTour();
-  }
-
-  updateNextEventLabel();
-  checkTimelineEvents();
-}
-
-
-
-    function endTour() {
-      setEventZone(
-        "Fin du Tour",
-        "Le temps est écoulé. Le Maillot Jaune est attribué au joueur avec le plus petit temps cumulé. Les autres maillots seront gérés dans une prochaine version."
-      );
-      // Désactiver tous les boutons "Fini"
-      const buttons = document.querySelectorAll(".btn-fini");
-      buttons.forEach((b) => (b.disabled = true));
-    }
-
-    // ======== RENDU JOUEURS ========
-
-    function renderPlayers() {
-      // Tri par tempsCumulé croissant (Maillot Jaune)
-      const sorted = [...state.joueurs].sort((a, b) => a.tempsCumulé - b.tempsCumulé);
-
-      elPlayersCard.innerHTML = "";
-
-      const leader = sorted.length > 0 ? sorted[0].tempsCumulé : 0;
-
-      sorted.forEach((j, index) => {
-        const row = document.createElement("div");
-        row.className = "player-row";
-
-        const topLine = document.createElement("div");
-        topLine.className = "player-top-line";
-
-        const left = document.createElement("div");
-        left.style.display = "flex";
-        left.style.alignItems = "center";
-
-        const rank = document.createElement("div");
-        rank.className = "player-rank";
-        rank.textContent = (index + 1) + ".";
-        left.appendChild(rank);
-
-        const name = document.createElement("div");
-        name.className = "player-name";
-        name.textContent = j.nom;
-        left.appendChild(name);
-
-        // Badge d'équipe si défini
-        if (j.equipeId && state.teams && state.teams.length > 0) {
-          const team = state.teams.find(t => t.id === j.equipeId);
-          if (team) {
-            const teamBadge = document.createElement("span");
-            teamBadge.style.marginLeft = "6px";
-            teamBadge.style.padding = "2px 6px";
-            teamBadge.style.borderRadius = "999px";
-            teamBadge.style.fontSize = "0.7rem";
-            teamBadge.style.fontWeight = "600";
-            teamBadge.style.backgroundColor = team.color || "#444";
-            teamBadge.style.color = "#000";
-            teamBadge.style.textTransform = "uppercase";
-            teamBadge.textContent = team.tag || "EQ";
-
-            left.appendChild(teamBadge);
-          }
-        }
-
-        // Badge SAGAN si actif
-        if (j.isSagan) {
-          const saganBadge = document.createElement("span");
-          saganBadge.style.marginLeft = "6px";
-          saganBadge.style.padding = "2px 6px";
-          saganBadge.style.borderRadius = "999px";
-          saganBadge.style.fontSize = "0.7rem";
-          saganBadge.style.fontWeight = "600";
-          saganBadge.style.backgroundColor = "#00c853"; // vert flashy
-          saganBadge.style.color = "#000";
-          saganBadge.style.textTransform = "uppercase";
-          saganBadge.textContent = "SAGAN";
-
-          left.appendChild(saganBadge);
-        }
-
-        topLine.appendChild(left);
-
-
-        if (j.incidentActif && j.incidentLabel) {
-          const inc = document.createElement("div");
-          inc.className = "player-incidents";
-          inc.textContent = "⚠ " + j.incidentLabel;
-          topLine.appendChild(inc);
-        }
-
-        row.appendChild(topLine);
-
-        // Ligne maillots
-        const badges = document.createElement("div");
-        badges.className = "player-maillots";
-
-        // Maillot Jaune : temps cumulé vs leader
-        const badgeJaune = document.createElement("div");
-        badgeJaune.className = "badge";
-        const dotJ = document.createElement("span");
-        dotJ.className = "badge-yellow-dot";
-        const labelJ = document.createElement("span");
-
-        if (j.tempsCumulé === leader) {
-          labelJ.textContent = "🟡 leader";
-        } else {
-          const delta = j.tempsCumulé - leader;
-          labelJ.textContent = formatDeltaSeconds(delta);
-        }
-        badgeJaune.appendChild(dotJ);
-        badgeJaune.appendChild(labelJ);
-        badges.appendChild(badgeJaune);
-
-        // Maillot Vert (placeholder, V1: 0)
-        const badgeVert = document.createElement("div");
-        badgeVert.className = "badge";
-        const dotV = document.createElement("span");
-        dotV.className = "badge-green-dot";
-        const labelV = document.createElement("span");
-        labelV.textContent = j.pointsVert + " pts";
-        badgeVert.appendChild(dotV);
-        badgeVert.appendChild(labelV);
-        badges.appendChild(badgeVert);
-
-        // Maillot à Pois (placeholder, V1: 0)
-        const badgePois = document.createElement("div");
-        badgePois.className = "badge";
-        const dotP = document.createElement("span");
-        dotP.className = "badge-red-dot";
-        const labelP = document.createElement("span");
-        labelP.textContent = j.pointsPois + " pts";
-        badgePois.appendChild(dotP);
-        badgePois.appendChild(labelP);
-        badges.appendChild(badgePois);
-
-        // Maillot Blanc (placeholder, V1: 0)
-        const badgeBlanc = document.createElement("div");
-        badgeBlanc.className = "badge";
-        const dotB = document.createElement("span");
-        dotB.className = "badge-white-dot";
-        const labelB = document.createElement("span");
-        labelB.textContent = j.pointsBlanc + " pts";
-        badgeBlanc.appendChild(dotB);
-        badgeBlanc.appendChild(labelB);
-        badges.appendChild(badgeBlanc);
-
-        row.appendChild(badges);
-
-        // Bouton Fini
-        const actions = document.createElement("div");
-        actions.className = "player-actions";
-        const btn = document.createElement("button");
-        btn.className = "btn-fini";
-        btn.textContent = "Fini";
-
-        btn.disabled = !state.pinteEnCours || j.aFiniCettePinte;
-
-        btn.addEventListener("click", () => {
-          handlePlayerFinish(j.id);
-        });
-
-        actions.appendChild(btn);
-        row.appendChild(actions);
-
-        elPlayersCard.appendChild(row);
-      });
-      renderTeams();   // <--- AJOUT
-
-    }
-
-    // ======== CLASSEMENT PAR ÉQUIPES ========
-    function renderTeams() {
-      if (!elTeamsCard) return;
-
-      // Si aucun mode équipe ou aucune équipe configurée
-      if (!state.teams || state.teams.length === 0) {
-        elTeamsCard.style.display = "none";
-        elTeamsCard.innerHTML = "";
-        return;
-      }
-
-      // Construire les stats par équipe
-      const statsMap = new Map();
-      state.teams.forEach(t => {
-        statsMap.set(t.id, {
-          team: t,
-          totalTemps: 0,
-          totalVerts: 0,
-          totalPois: 0,
-          totalBlancs: 0,
-          nbJoueurs: 0
-        });
-      });
-
-      // Aggrégation des joueurs dans leur équipe
-      state.joueurs.forEach(j => {
-        if (!j.equipeId || !statsMap.has(j.equipeId)) return;
-        const s = statsMap.get(j.equipeId);
-        s.totalTemps  += j.tempsCumulé;
-        s.totalVerts  += j.pointsVert;
-        s.totalPois   += j.pointsPois;
-        s.totalBlancs += j.pointsBlanc;
-        s.nbJoueurs   += 1;
-      });
-
-      // Filtrer les équipes qui n'ont aucun joueur
-      let stats = Array.from(statsMap.values()).filter(s => s.nbJoueurs > 0);
-      if (stats.length === 0) {
-        elTeamsCard.style.display = "none";
-        elTeamsCard.innerHTML = "";
-        return;
-      }
-
-      // Classement sur la base du temps moyen par joueur
-      stats.forEach(s => {
-        s.avgTemps = s.totalTemps / s.nbJoueurs;
-      });
-      stats.sort((a, b) => a.avgTemps - b.avgTemps);
-
-      const bestAvg = stats[0].avgTemps;
-
-      let html = "";
-
-      stats.forEach((s, idx) => {
-        const delta = s.avgTemps - bestAvg;
-        const deltaStr = idx === 0 ? "leader" : formatDeltaSeconds(delta);
-
-        html += `
-          <div class="player-row">
-            <div class="player-top-line">
-              <div style="display:flex; align-items:center;">
-                <div class="player-rank">${idx + 1}.</div>
-                <div class="player-name">
-                  <span style="
-                    display:inline-flex;
-                    align-items:center;
-                    padding:2px 8px;
-                    border-radius:999px;
-                    font-size:0.75rem;
-                    font-weight:700;
-                    margin-right:6px;
-                    background:${s.team.color || "#444"};
-                    color:#000;
-                    text-transform:uppercase;
-                  ">
-                    ${s.team.tag || "EQ"}
-                  </span>
-                  ${s.team.name || "Équipe"}
-                </div>
-              </div>
-              <div style="font-size:0.8rem; color:var(--text-muted);">
-                ${deltaStr}
-              </div>
-            </div>
-
-            <div class="player-maillots">
-              <div class="badge">
-                <span class="badge-green-dot"></span>
-                <span>${s.totalVerts} pts</span>
-              </div>
-              <div class="badge">
-                <span class="badge-red-dot"></span>
-                <span>${s.totalPois} pts</span>
-              </div>
-              <div class="badge">
-                <span class="badge-white-dot"></span>
-                <span>${s.totalBlancs} pts</span>
-              </div>
-            </div>
-          </div>
-        `;
-      });
-
-      elTeamsCard.innerHTML = html;
-      elTeamsCard.style.display = "block";
-    }
-
-
-    // ======== GESTION FIN DE PINTE (MAILLOT JAUNE) ========
-
-    function handlePlayerFinish(joueurId) {
-      if (!state.pinteEnCours) return;
-
-      const joueur = state.joueurs.find((j) => j.id === joueurId);
-      if (!joueur) return;
-      if (joueur.aFiniCettePinte) return;
-
-      const t = nowSeconds();
-      joueur.aFiniCettePinte = true;
-      state.finPinteOrdre.push({ joueurId, timestamp: t });
-
-      setEventZone(
-        "Arrivée enregistrée",
-        `${joueur.nom} a terminé sa pinte. Quand tout le monde a fini, le classement de l’étape sera calculé.`
-      );
-
-      // Si tous les joueurs ont fini, on clôt l'étape
-      const allFinished = state.joueurs.every((j) => j.aFiniCettePinte);
-      if (allFinished) {
-        finalizeStage();
-      } else {
-        renderPlayers();
-      }
-    }
-
-    function finalizeStage() {
-      if (state.finPinteOrdre.length === 0) return;
-
-      // classer par timestamp
-      const classement = [...state.finPinteOrdre].sort(
-        (a, b) => a.timestamp - b.timestamp
-      );
-
-      const t0 = classement[0].timestamp;
-
-      // Bonifications : 1er -5", 2e -2", 3e -1"
-      const bonus = [5, 2, 1];
-
-      let resumeEtape = "Résultat de l’étape :\n";
-
-      classement.forEach((entry, idx) => {
-        const joueur = state.joueurs.find((j) => j.id === entry.joueurId);
-        if (!joueur) return;
-
-        const brut = entry.timestamp - t0; // en secondes
-        const b = idx < bonus.length ? bonus[idx] : 0;
-        let net = brut - b;
-        if (net < 0) net = 0;
-
-        joueur.tempsCumulé += net;
-
-        const rang = idx + 1;
-        const deltaStr = formatDeltaSeconds(brut);
-        const netStr = formatDeltaSeconds(net);
-
-        resumeEtape += `${rang}. ${joueur.nom} (${deltaStr}, bonif -${b}", net ${netStr})\n`;
-      });
-
-      // reset pinte
-      state.pinteEnCours = true;
-      state.finPinteOrdre = [];
-      state.joueurs.forEach((j) => {
-        j.aFiniCettePinte = false;
-      });
-
-// Nouvelle pinte = nouvelle étape
-state.numeroPinte += 1;
-cleanExpiredIncidents();
-
-      renderPlayers();
-
-      setEventZone("Étape terminée", resumeEtape.trim());
-      saveGame();
-
-    }
-
-    function setEventZone(title, body) {
-      const titleEl = elEventZone.querySelector(".event-title");
-      const bodyEl = elEventZone.querySelector(".event-body");
-      if (titleEl) titleEl.textContent = title;
-      if (bodyEl) {
-        bodyEl.textContent = "";
-        bodyEl.textContent = body;
-      }
-    }
-
-    // Initial (avant setup)
-    renderPlayers();
-function renderSprintInterface() {
-  const html = [];
-
-  html.push(`<div class="event-title">⚡ SPRiNT !</div>`);
-  html.push(`<div class="event-body">Classez les joueurs dans l'ordre d'arrivée :</div>`);
-
-  html.push(`<div style="margin-top:10px;">`);
-  state.joueurs.forEach(j => {
-    html.push(`
-      <div style="margin-bottom:8px;">
-        <label style="font-size:0.85rem;">${j.nom}</label>
-        <select id="sprint-${j.id}" class="form-select">
-          ${state.joueurs.map((_,i)=>`<option value="${i+1}">${i+1}</option>`).join("")}
-        </select>
-      </div>
-    `);
-  });
-  html.push(`</div>`);
-
-  html.push(`
-    <button id="btn-valider-sprint" class="btn-primary" style="margin-top:12px;">
-      Valider le sprint
-    </button>
-  `);
-
-  document.getElementById("event-zone").innerHTML = html.join("");
-
-  document.getElementById("btn-valider-sprint").addEventListener("click", validerSprint);
-}
-
-function validerSprint() {
-  const classements = [];
-
-  state.joueurs.forEach(j => {
-    const rank = parseInt(document.getElementById(`sprint-${j.id}`).value, 10);
-    classements.push({ id: j.id, rank });
-  });
-
-  // Tri par rang (1 = meilleur)
-  classements.sort((a,b)=>a.rank-b.rank);
-
-  const points = [10, 6, 4, 3, 2, 1];
-  let result = "Résultats du Sprint :\n\n";
-
-  let nouveauSaganNom = null;
-
-  classements.forEach((entry, idx) => {
-    const joueur = state.joueurs.find(j=>j.id===entry.id);
-    if (!joueur) return;
-
-    // 1) Gestion des victoires consécutives
-    if (idx === 0) {
-      // Vainqueur du sprint
-      joueur.sprintsWonConsecutifs = (joueur.sprintsWonConsecutifs || 0) + 1;
-
-      // Activation éventuelle du mode SAGAN (2 sprints de suite)
-      if (!joueur.isSagan && joueur.sprintsWonConsecutifs >= 2) {
-        joueur.isSagan = true;
-        joueur.saganExpireTimestamp = nowSeconds() + 3600; // 1h
-        nouveauSaganNom = joueur.nom;
-      }
+    if (!supabaseReady) {
+      elSupabaseWarning.style.display = "block";
+      updateRoomCodeUI("OFFLINE");
     } else {
-      // Tous les autres perdent leur série
-      joueur.sprintsWonConsecutifs = 0;
-    }
-
-    // 2) Points verts
-    const basePoints = points[idx] || 1;
-    let totalPoints = basePoints;
-
-    // Bonus SAGAN : +3 points verts à chaque sprint
-    if (joueur.isSagan) {
-      totalPoints += 3;
-    }
-
-    joueur.pointsVert += totalPoints;
-
-    // 3) Texte de résultat
-    if (joueur.isSagan) {
-      result += `${idx+1}. ${joueur.nom} (+${basePoints} pts +3 pts SAGAN = ${totalPoints} pts)\n`;
-    } else {
-      result += `${idx+1}. ${joueur.nom} (+${totalPoints} pts)\n`;
+      await setupHostRoom();
     }
   });
 
-  if (nouveauSaganNom) {
-    result += `\n${nouveauSaganNom} passe en mode SAGAN pour 1 heure !`;
-  }
+  elBtnModePlayer.addEventListener("click", () => {
+    elCoverScreen.style.opacity = "0";
+    setTimeout(() => {
+      elCoverScreen.style.display = "none";
+    }, 400);
 
-  sprintActif = false;
-  sprintCooldown = nowSeconds() + 900; // 15 min de cooldown
-  sprintLanceur = null;
+    elMainContent.style.display = "none";
+    elPlayerContent.style.display = "block";
 
-  renderPlayers();
-  setEventZone("Sprint terminé", result.trim());
-  saveGame();
-}
-
-function renderCoteInterface() {
-  const html = [];
-
-  html.push(`<div class="event-title">⛰️ Côte</div>`);
-  html.push(`<div class="event-body">Grimpez et arrêtez-vous à <b>${coteCible}%</b>. Quand tout le monde a stoppé, appuyez sur le bouton.</div>`);
-
-  html.push(`
-    <button id="btn-cote-stop" class="btn-primary" style="margin-top:12px;">
-      Tout le monde a stoppé
-    </button>
-  `);
-
-  document.getElementById("event-zone").innerHTML = html.join("");
-
-  document.getElementById("btn-cote-stop").addEventListener("click", renderCoteClassement);
-}
-
-function renderCoteClassement() {
-  const html = [];
-
-  html.push(`<div class="event-title">Classement de la Côte</div>`);
-  html.push(`<div class="event-body">Classez les grimpeurs du plus précis au moins précis :</div>`);
-
-  html.push(`<div style="margin-top:10px;">`);
-  state.joueurs.forEach(j => {
-    html.push(`
-      <div style="margin-bottom:8px;">
-        <label style="font-size:0.85rem;">${j.nom}</label>
-        <select id="cote-${j.id}" class="form-select">
-          ${state.joueurs.map((_,i)=>`<option value="${i+1}">${i+1}</option>`).join("")}
-        </select>
-      </div>
-    `);
-  });
-  html.push(`</div>`);
-
-  html.push(`
-    <button id="btn-valider-cote" class="btn-primary" style="margin-top:12px;">
-      Valider la Côte
-    </button>
-  `);
-
-  document.getElementById("event-zone").innerHTML = html.join("");
-
-  document.getElementById("btn-valider-cote").addEventListener("click", validerCote);
-}
-
-function validerCote() {
-  const classements = [];
-
-  // Récupère le classement choisi
-  state.joueurs.forEach(j => {
-    const rank = parseInt(document.getElementById(`cote-${j.id}`).value, 10);
-    classements.push({ id: j.id, rank });
+    if (!supabaseReady) {
+      elPlayerStatus.textContent = "Supabase non configuré. Mode Player indisponible.";
+      elBtnPlayerJoin.disabled = true;
+    }
   });
 
-  // Tri par rang
-  classements.sort((a,b)=>a.rank-b.rank);
-
-  // Barème des points
-  const points = [8, 5, 3, 2, 1, 1, 1];
-
-  // Préparation du texte du classement
-  let recap = "Résultats de la Côte :<br><br>";
-
-  classements.forEach((entry, idx) => {
-    const joueur = state.joueurs.find(j=>j.id===entry.id);
-    const p = points[idx] || 1;
-    joueur.pointsPois += p;
-    recap += `${idx+1}. ${joueur.nom} (+${p} pts)<br>`;
+  elBtnPlayerJoin.addEventListener("click", () => {
+    joinRoomAsPlayer();
   });
 
-  coteActive = false;
-  coteCible = null;
-
-  // Met à jour les badges
-  renderPlayers();
-
-  // Zone événement : affichage avec bouton OK
-  const html = `
-    <div class="event-title">Côte terminée</div>
-    <div class="event-body">${recap}</div>
-
-    <button id="btn-cote-ok" class="btn-primary" style="margin-top:12px;">
-      OK
-    </button>
-  `;
-
-  document.getElementById("event-zone").innerHTML = html;
-
-  // Bouton OK = retour à l'écran principal
-  document.getElementById("btn-cote-ok").addEventListener("click", () => {
-    setEventZone(
-      "Aucun événement en cours",
-      "Quand une pinte est terminée, appuie sur « Fini »."
-    );
-    saveGame();
+  elBtnPlayerFinish.addEventListener("click", () => {
+    sendFinishEvent();
   });
 
-}
-
-function renderEchappeeInterface() {
-  const html = [];
-
-  html.push(`<div class="event-title">🚴 Échappée</div>`);
-  html.push(`<div class="event-body">Le plus rapide gagne ! Touchez votre bouton dès qu'il apparaît :</div>`);
-
-  html.push(`<div style="margin-top:12px;">`);
-
-  state.joueurs.forEach(j => {
-    html.push(`
-      <button id="echappee-${j.id}" class="btn-primary" style="width:100%; margin-bottom:8px; background:#ffffff; color:#000;">
-        ${j.nom}
-      </button>
-    `);
+  elBtnConfigSupabase.addEventListener("click", () => {
+    elSupabaseConfigError.textContent = "";
+    elSupabaseUrlInput.value = localStorage.getItem("supabaseUrl") || "";
+    elSupabaseKeyInput.value = localStorage.getItem("supabaseAnonKey") || "";
+    elSupabaseConfigModal.style.display = "flex";
   });
 
-  html.push(`</div>`);
-
-  document.getElementById("event-zone").innerHTML = html.join("");
-
-  // Écouteurs individuels
-  state.joueurs.forEach(j => {
-    document.getElementById(`echappee-${j.id}`).addEventListener("click", () => {
-      handleEchappeeClick(j.id);
-    });
-  });
-}
-
-function handleEchappeeClick(joueurId) {
-  if (!echappeeActive) return;
-
-  echappeeClics.push({
-    id: joueurId,
-    t: nowSeconds()
+  elBtnCloseSupabase.addEventListener("click", () => {
+    elSupabaseConfigModal.style.display = "none";
   });
 
-  if (echappeeClics.length === state.joueurs.length) {
-    finalizeEchappee();
-  }
-}
+  elBtnSaveSupabase.addEventListener("click", () => {
+    const url = elSupabaseUrlInput.value.trim();
+    const key = elSupabaseKeyInput.value.trim();
 
-function finalizeEchappee() {
-  echappeeActive = false;
-
-  echappeeClics.sort((a,b)=>a.t - b.t);
-
-  const points = [3, 1]; // 1er = 3 points, 2e = 1
-  let recap = "Résultats de l'échappée :<br><br>";
-
-  echappeeClics.forEach((entry, idx) => {
-    const joueur = state.joueurs.find(j=>j.id===entry.id);
-    const p = points[idx] || 0;
-    joueur.pointsBlanc += p;
-    recap += `${idx+1}. ${joueur.nom} (+${p} pts)<br>`;
-  });
-
-  renderPlayers();
-
-  const html = `
-    <div class="event-title">Échappée terminée</div>
-    <div class="event-body">${recap}</div>
-
-    <button id="btn-echappee-ok" class="btn-primary" style="margin-top:12px;">
-      OK
-    </button>
-  `;
-
-  document.getElementById("event-zone").innerHTML = html;
-
-  document.getElementById("btn-echappee-ok").addEventListener("click", () => {
-    setEventZone(
-      "Aucun événement en cours",
-      "Quand une pinte est terminée, appuie sur « Fini »."
-    );
-    saveGame();
-  });
-
-}
-
-function renderIncidentInterface() {
-  const inc = incidentData;
-
-  let target = null;
-
-  // Choix du joueur si type = player, en excluant les SAGAN
-  if (inc.type === "player") {
-    const candidates = state.joueurs.filter(j => !j.isSagan);
-
-    if (candidates.length === 0) {
-      // Personne à cibler -> incident annulé
-      incidentActif = false;
-      incidentData = null;
-      setEventZone("Aucun incident", "Tous les coureurs sont en mode SAGAN, l'incident est annulé.");
+    if (!url || !key) {
+      elSupabaseConfigError.textContent = "URL et clé sont obligatoires.";
       return;
     }
 
-    const idx = Math.floor(Math.random() * candidates.length);
-    target = candidates[idx];
-  }
+    localStorage.setItem("supabaseUrl", url);
+    localStorage.setItem("supabaseAnonKey", key);
 
-  let html = `<div class="event-title">⚠️ Incident</div>`;
+    SUPABASE_CONFIG = loadSupabaseConfig();
+    supabaseReady = isSupabaseReady(SUPABASE_CONFIG);
+    supabaseClient = supabaseReady ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey) : null;
 
-  if (inc.type === "player") {
-    html += `<div class="event-body"><b>${inc.label}</b><br><br>Cible : <b>${target.nom}</b></div>`;
-  }
-  else if (inc.type === "all") {
-    html += `<div class="event-body"><b>${inc.label}</b><br><br>Tous les joueurs sont concernés (hors SAGAN).</div>`;
-  }
-  else {
-    html += `<div class="event-body"><b>${inc.label}</b><br><br>Impact gameplay.</div>`;
-  }
-
-  html += `
-    <button id="btn-incident-ok" class="btn-primary" style="margin-top:12px;">
-      OK
-    </button>
-  `;
-
-  document.getElementById("event-zone").innerHTML = html;
-
-  document.getElementById("btn-incident-ok").addEventListener("click", () => {
-    // Appliquer l'incident au joueur si nécessaire
-    if (inc.type === "player" && target && !target.isSagan) {
-      target.incidentActif = true;
-      target.incidentLabel = inc.label;
-
-      if (inc.duration === "1-pinte") {
-        target.incidentExpirePinte = state.numeroPinte; 
-      }
-      if (inc.duration === "5-min") {
-        target.incidentExpireTimestamp = nowSeconds() + 300;
-      }
-    }
-
-    if (inc.type === "all") {
-      state.joueurs.forEach(j => {
-        if (j.isSagan) return; // immunité
-
-        j.incidentActif = true;
-        j.incidentLabel = inc.label;
-
-        if (inc.duration === "1-pinte") {
-          j.incidentExpirePinte = state.numeroPinte; 
-        }
-        if (inc.duration === "5-min") {
-          j.incidentExpireTimestamp = nowSeconds() + 300;
-        }
-      });
-    }
-
-    renderPlayers();
-
-    incidentActif = false;
-    incidentData = null;
-
-    setEventZone(
-      "Aucun événement en cours",
-      "Quand une pinte est terminée, appuie sur « Fini »."
-    );
-    saveGame();
+    elSupabaseConfigModal.style.display = "none";
+    location.reload();
   });
-}
 
-
-
-// Nettoyage des incidents expirés (par pinte ou par délai)
-function cleanExpiredIncidents() {
-  const now = nowSeconds();
-
-  state.joueurs.forEach(j => {
-    // Expiration par pinte
-    if (j.incidentExpirePinte !== null) {
-      if (j.incidentExpirePinte < state.numeroPinte) {
-        j.incidentActif = false;
-        j.incidentLabel = null;
-        j.incidentExpirePinte = null;
+  const elProfilRadios = document.querySelectorAll('input[name="profil-etape"]');
+  elProfilRadios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      if (radio.checked) {
+        state.difficulte = radio.value;
       }
-    }
-
-    // Expiration par délai
-    if (j.incidentExpireTimestamp !== null) {
-      if (now >= j.incidentExpireTimestamp) {
-        j.incidentActif = false;
-        j.incidentLabel = null;
-        j.incidentExpireTimestamp = null;
-      }
-    }
+    });
   });
-}
 
-function checkSaganExpiry() {
-  const now = nowSeconds();
-
-  state.joueurs.forEach(j => {
-    if (j.isSagan && j.saganExpireTimestamp && now >= j.saganExpireTimestamp) {
-      j.isSagan = false;
-      j.saganExpireTimestamp = null;
-      j.sprintsWonConsecutifs = 0;
-    }
-  });
-}
-
-// Tick du timer principal
-function tickTimer() {
-  const remaining = Math.floor(state.tourFinTimestamp - nowSeconds());
-
-  if (remaining <= 0) {
-    clearInterval(state.timerInterval);
-    elTimer.textContent = "00:00:00";
-    endTour();
-  } else {
-    elTimer.textContent = formatTimeHMS(remaining);
-  }
-
-  // Expiration du mode SAGAN si besoin
-  checkSaganExpiry();
-
-  updateNextEventLabel();
-  checkTimelineEvents();
-}
-
-// DOMContentLoaded = quand le HTML est chargé et le DOM prêt
-document.addEventListener("DOMContentLoaded", () => {
-  tryRestoreGameOnLoad();
-});
-
+  renderPlayers();
 </script>
-  <!-- SONS -->
-  <audio id="snd-sprint"    src="snd/sprint.mp3"    preload="auto"></audio>
-  <audio id="snd-cote"      src="snd/cote.mp3"      preload="auto"></audio>
-  <audio id="snd-echappee"  src="snd/echappee.mp3"  preload="auto"></audio>
-  <audio id="snd-incident"  src="snd/incident.mp3"  preload="auto"></audio>
-	</div>
+
+<!-- SQL & RLS (pour tests rapides, RLS peut être désactivé temporairement) -->
+<script type="text/plain" id="supabase-sql">
+-- Tables
+create table if not exists public.rooms (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.events (
+  id bigint generated by default as identity primary key,
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  type text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+-- RLS (désactivez pour tester rapidement, mais réactivez en prod)
+-- alter table public.rooms enable row level security;
+-- alter table public.events enable row level security;
+-- create policy "rooms read" on public.rooms for select using (true);
+-- create policy "events insert" on public.events for insert with check (true);
+-- create policy "events read" on public.events for select using (true);
+</script>
+
+<!-- SONS -->
+<audio id="snd-sprint" src="snd/sprint.mp3" preload="auto"></audio>
+<audio id="snd-cote" src="snd/cote.mp3" preload="auto"></audio>
+<audio id="snd-echappee" src="snd/echappee.mp3" preload="auto"></audio>
+<audio id="snd-incident" src="snd/incident.mp3" preload="auto"></audio>
 </body>
 </html>
