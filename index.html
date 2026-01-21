@@ -1655,13 +1655,18 @@
     classements.sort((a, b) => a.rank - b.rank);
 
     const points = [10, 6, 4, 3, 2, 1];
+    const bonifs = [25, 15, 10];
     let result = "Résultats du Sprint :\n\n";
 
     classements.forEach((entry, idx) => {
       const joueur = state.joueurs.find((j) => j.id === entry.id);
       const p = points[idx] || 1;
       joueur.pointsVert += p;
-      result += `${idx + 1}. ${joueur.nom} (+${p} pts)\n`;
+      const bonif = bonifs[idx] || 0;
+      if (bonif > 0) {
+        joueur.tempsCumulé = Math.max(0, joueur.tempsCumulé - bonif);
+      }
+      result += `${idx + 1}. ${joueur.nom} (+${p} pts${bonif ? `, -${bonif}s` : ""})\n`;
     });
 
     sprintActif = false;
