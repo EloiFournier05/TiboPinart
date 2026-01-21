@@ -1971,6 +1971,13 @@
       return;
     }
 
+    try {
+      await ensureSignedIn();
+    } catch (error) {
+      elPlayerStatus.textContent = `Connexion Supabase impossible: ${error.message || "auth"}.`;
+      return;
+    }
+
     let error = null;
 
     if (state.dataMode === "pinte_finishes") {
@@ -1983,6 +1990,10 @@
 
       const { data: sessionData } = await supabaseClient.auth.getSession();
       const userId = sessionData?.session?.user?.id;
+      if (!userId) {
+        elPlayerStatus.textContent = "Session invalide. Rejoins la salle à nouveau.";
+        return;
+      }
       const { error: insertError } = await supabaseClient.from("pinte_finishes").insert({
         room_id: state.roomId,
         pint_no: pintNo,
@@ -1999,7 +2010,7 @@
     }
 
     if (error) {
-      elPlayerStatus.textContent = "Erreur Supabase, réessaie.";
+      elPlayerStatus.textContent = `Erreur Supabase: ${error.message || "réessaie"}.`;
       return;
     }
 
