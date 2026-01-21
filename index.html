@@ -707,8 +707,10 @@
     roomId: null,
     roomCode: null,
     roomSubscription: null,
+    eventSubscription: null,
     dataMode: "events",
-    memberNameCache: new Map()
+    memberNameCache: new Map(),
+    finishSignals: new Set()
   };
 
   let sprintActif = false;
@@ -848,6 +850,18 @@
       elSupabaseStatus.style.display = "block";
     }
     setEventZone("Supabase", message);
+  }
+
+  function getFinishKey(name) {
+    return `${state.numeroPinte}:${(name || "").trim().toLowerCase()}`;
+  }
+
+  function recordFinish(name) {
+    const key = getFinishKey(name);
+    if (!key || key.endsWith(":")) return false;
+    if (state.finishSignals.has(key)) return false;
+    state.finishSignals.add(key);
+    return true;
   }
 
   async function ensureSignedIn() {
@@ -1861,6 +1875,9 @@
     if (state.roomSubscription) {
       supabaseClient.removeChannel(state.roomSubscription);
     }
+    if (state.eventSubscription) {
+      supabaseClient.removeChannel(state.eventSubscription);
+    }
 
     const channel = supabaseClient
       .channel(`room-${state.roomId}`)
@@ -1886,6 +1903,8 @@
           const normalized = (playerName || "").trim().toLowerCase();
           if (!normalized) return;
 
+          if (!recordFinish(normalized)) return;
+
           const joueur = state.joueurs.find((j) => j.nom.toLowerCase() === normalized);
           if (!joueur) {
             setEventZone("Signal joueur inconnu", `${playerName} n'existe pas dans la liste.`);
@@ -1898,6 +1917,36 @@
       .subscribe();
 
     state.roomSubscription = channel;
+
+    if (state.dataMode === "pinte_finishes") {
+      const eventChannel = supabaseClient
+        .channel(`room-events-${state.roomId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "events",
+            filter: `room_id=eq.${state.roomId}`
+          },
+          (payload) => {
+            if (!payload.new || payload.new.type !== "finish") return;
+            const playerName = payload.new.payload?.playerName || "";
+            const normalized = playerName.trim().toLowerCase();
+            if (!normalized) return;
+            if (!recordFinish(normalized)) return;
+            const joueur = state.joueurs.find((j) => j.nom.toLowerCase() === normalized);
+            if (!joueur) {
+              setEventZone("Signal joueur inconnu", `${playerName} n'existe pas dans la liste.`);
+              return;
+            }
+            handlePlayerFinish(joueur.id);
+          }
+        )
+        .subscribe();
+
+      state.eventSubscription = eventChannel;
+    }
   }
 
   async function joinRoomAsPlayer() {
@@ -2005,6 +2054,14 @@
           { onConflict: "room_id,pint_no,user_id", ignoreDuplicates: true }
         );
       error = insertError;
+
+      if (!error) {
+        await supabaseClient.from("events").insert({
+          room_id: state.roomId,
+          type: "finish",
+          payload: { playerName: name }
+        });
+      }
     } else {
       const { error: insertError } = await supabaseClient.from("events").insert({
         room_id: state.roomId,
@@ -2020,6 +2077,10 @@
     }
 
     elPlayerStatus.textContent = "Arrivée envoyée !";
+    elBtnPlayerFinish.disabled = true;
+    setTimeout(() => {
+      elBtnPlayerFinish.disabled = false;
+    }, 8000);
   }
 
   document.getElementById("btn-sprint").addEventListener("click", () => {
