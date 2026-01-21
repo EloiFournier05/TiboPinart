@@ -487,6 +487,7 @@
       <div class="next-event" id="supabase-warning" style="display:none;">
         Supabase non configuré, le mode Player est désactivé.
       </div>
+      <div class="next-event" id="supabase-status" style="display:none;"></div>
     </header>
 
     <section class="players-card" id="players-card">
@@ -771,6 +772,7 @@
   const elMainContent = document.getElementById("main-content");
   const elPlayerContent = document.getElementById("player-content");
   const elSupabaseWarning = document.getElementById("supabase-warning");
+  const elSupabaseStatus = document.getElementById("supabase-status");
   const elRoomCodeValue = document.getElementById("room-code-value");
   const elCopyRoom = document.getElementById("btn-copy-room");
 
@@ -824,10 +826,28 @@
   }
 
   function setEventZone(title, body) {
-    const titleEl = elEventZone.querySelector(".event-title");
-    const bodyEl = elEventZone.querySelector(".event-body");
+    let titleEl = elEventZone.querySelector(".event-title");
+    let bodyEl = elEventZone.querySelector(".event-body");
+
+    if (!titleEl || !bodyEl) {
+      elEventZone.innerHTML = `
+        <div class="event-title"></div>
+        <div class="event-body"></div>
+      `;
+      titleEl = elEventZone.querySelector(".event-title");
+      bodyEl = elEventZone.querySelector(".event-body");
+    }
+
     if (titleEl) titleEl.textContent = title;
     if (bodyEl) bodyEl.textContent = body;
+  }
+
+  function showSupabaseError(message) {
+    if (elSupabaseStatus) {
+      elSupabaseStatus.textContent = message;
+      elSupabaseStatus.style.display = "block";
+    }
+    setEventZone("Supabase", message);
   }
 
   async function ensureSignedIn() {
@@ -1743,7 +1763,7 @@
     try {
       await ensureSignedIn();
     } catch (error) {
-      setEventZone("Supabase", "Connexion impossible. Vérifiez l'URL et la clé anon.");
+      showSupabaseError("Connexion impossible. Vérifiez l'URL et la clé anon.");
       return null;
     }
 
@@ -1763,8 +1783,7 @@
       }
 
       if (rpcError) {
-        setEventZone(
-          "Supabase",
+        showSupabaseError(
           `Erreur RPC create_room: ${rpcError.message || "inconnue"}. Vérifiez vos policies/auth.`
         );
         return null;
@@ -1799,13 +1818,16 @@
     }
 
     elSupabaseWarning.style.display = "none";
+    if (elSupabaseStatus) {
+      elSupabaseStatus.style.display = "none";
+      elSupabaseStatus.textContent = "";
+    }
     let room = null;
     room = await createRoom();
 
     if (!room) {
       updateRoomCodeUI("ERR");
-      setEventZone(
-        "Supabase",
+      showSupabaseError(
         "Impossible de créer la salle. Vérifiez l'URL/clé, les policies RLS et que l'auth anonyme est activée."
       );
       return;
