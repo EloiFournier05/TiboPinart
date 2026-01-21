@@ -366,6 +366,16 @@
       padding: 12px 18px;
     }
 
+    .config-link {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: #f6f6f6;
+      text-decoration: underline;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+    }
+
     .player-card {
       background: var(--bg-card);
       border-radius: var(--radius);
@@ -453,6 +463,10 @@
     <button id="btn-mode-host" class="btn-primary" style="background:#ffd60a;">Mode Host</button>
     <button id="btn-mode-player" class="btn-primary" style="background:#ffffff; color:#000;">Mode Player</button>
   </div>
+
+  <button id="btn-config-supabase" class="config-link" type="button">
+    Configurer Supabase
+  </button>
 </div>
 
 <div id="main-content">
@@ -605,6 +619,27 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="supabase-config-modal" style="display:none;">
+  <div class="modal">
+    <h1>Configurer Supabase</h1>
+    <p>Collez votre URL Supabase et votre clé anon. Elles seront stockées en local sur cet appareil.</p>
+
+    <div class="form-group">
+      <label class="form-label" for="supabase-url-input">Supabase URL</label>
+      <input id="supabase-url-input" class="form-input" type="text" placeholder="https://xxxx.supabase.co" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="supabase-key-input">Supabase anon key</label>
+      <input id="supabase-key-input" class="form-input" type="text" placeholder="eyJhbGciOi..." />
+    </div>
+
+    <button class="btn-primary" id="btn-save-supabase">Enregistrer</button>
+    <button class="btn-secondary" id="btn-close-supabase">Fermer</button>
+    <div class="error-text" id="supabase-config-error"></div>
+  </div>
+</div>
+
 <div id="player-content">
   <div class="app">
     <header class="header">
@@ -633,16 +668,28 @@
   // === SUPABASE CONFIG ===
   // Remplacez ces placeholders avant déploiement (Vercel -> Variables d’environnement).
   // Pour une version statique, définissez window.SUPABASE_URL et window.SUPABASE_ANON_KEY avant ce script.
-  const SUPABASE_CONFIG = {
-    url: window.SUPABASE_URL || "YOUR_SUPABASE_URL",
-    anonKey: window.SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY"
-  };
+  function loadSupabaseConfig() {
+    const storedUrl = localStorage.getItem("supabaseUrl");
+    const storedKey = localStorage.getItem("supabaseAnonKey");
+    const metaUrl = document.querySelector('meta[name="supabase-url"]')?.content;
+    const metaKey = document.querySelector('meta[name="supabase-anon-key"]')?.content;
 
-  const supabaseReady = SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey &&
-    !SUPABASE_CONFIG.url.includes("YOUR_SUPABASE") &&
-    !SUPABASE_CONFIG.anonKey.includes("YOUR_SUPABASE");
+    return {
+      url: window.SUPABASE_URL || metaUrl || storedUrl || "YOUR_SUPABASE_URL",
+      anonKey: window.SUPABASE_ANON_KEY || metaKey || storedKey || "YOUR_SUPABASE_ANON_KEY"
+    };
+  }
 
-  const supabaseClient = supabaseReady ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey) : null;
+  let SUPABASE_CONFIG = loadSupabaseConfig();
+
+  function isSupabaseReady(config) {
+    return config.url && config.anonKey &&
+      !config.url.includes("YOUR_SUPABASE") &&
+      !config.anonKey.includes("YOUR_SUPABASE");
+  }
+
+  let supabaseReady = isSupabaseReady(SUPABASE_CONFIG);
+  let supabaseClient = supabaseReady ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey) : null;
 
   const state = {
     joueurs: [],
@@ -658,7 +705,9 @@
     teams: [],
     roomId: null,
     roomCode: null,
-    roomSubscription: null
+    roomSubscription: null,
+    dataMode: "events",
+    memberNameCache: new Map()
   };
 
   let sprintActif = false;
@@ -731,6 +780,14 @@
   const elBtnPlayerFinish = document.getElementById("btn-player-finish");
   const elPlayerStatus = document.getElementById("player-status");
 
+  const elSupabaseConfigModal = document.getElementById("supabase-config-modal");
+  const elSupabaseUrlInput = document.getElementById("supabase-url-input");
+  const elSupabaseKeyInput = document.getElementById("supabase-key-input");
+  const elSupabaseConfigError = document.getElementById("supabase-config-error");
+  const elBtnConfigSupabase = document.getElementById("btn-config-supabase");
+  const elBtnSaveSupabase = document.getElementById("btn-save-supabase");
+  const elBtnCloseSupabase = document.getElementById("btn-close-supabase");
+
   const sndSprint = document.getElementById("snd-sprint");
   const sndCote = document.getElementById("snd-cote");
   const sndEchappee = document.getElementById("snd-echappee");
@@ -771,6 +828,18 @@
     const bodyEl = elEventZone.querySelector(".event-body");
     if (titleEl) titleEl.textContent = title;
     if (bodyEl) bodyEl.textContent = body;
+  }
+
+  async function ensureSignedIn() {
+    if (!supabaseClient) return null;
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    if (sessionData?.session) return sessionData.session;
+
+    const { data, error } = await supabaseClient.auth.signInAnonymously();
+    if (error) {
+      throw error;
+    }
+    return data.session;
   }
 
   function playSound(type) {
@@ -1355,6 +1424,12 @@
     renderPlayers();
 
     setEventZone("Étape terminée", resumeEtape.trim());
+
+    if (supabaseClient && state.roomId && state.dataMode === "pinte_finishes") {
+      supabaseClient.from("rooms").update({
+        pint_no: state.numeroPinte
+      }).eq("id", state.roomId);
+    }
   }
 
   function renderSprintInterface() {
@@ -1665,8 +1740,23 @@
   async function createRoom() {
     if (!supabaseClient) return null;
 
+    await ensureSignedIn();
+
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const code = generateRoomCode(6);
+
+      const { data: rpcData, error: rpcError } = await supabaseClient.rpc("create_room", {
+        p_code: code,
+        p_duree_minutes: state.dureeMinutes,
+        p_difficulte: state.difficulte,
+        p_display_name: "Host"
+      });
+
+      if (!rpcError && rpcData) {
+        state.dataMode = "pinte_finishes";
+        return { id: rpcData, code };
+      }
+
       const { data, error } = await supabaseClient
         .from("rooms")
         .insert({ code })
@@ -1674,6 +1764,7 @@
         .single();
 
       if (!error && data) {
+        state.dataMode = "events";
         return data;
       }
     }
@@ -1695,7 +1786,12 @@
     }
 
     elSupabaseWarning.style.display = "none";
-    const room = await createRoom();
+    let room = null;
+    try {
+      room = await createRoom();
+    } catch (error) {
+      setEventZone("Supabase", "Connexion impossible. Vérifiez votre URL/clé.");
+    }
 
     if (!room) {
       updateRoomCodeUI("ERR");
@@ -1710,6 +1806,21 @@
     subscribeToRoom();
   }
 
+  async function fetchProfileName(userId) {
+    if (!supabaseClient || !userId) return null;
+    if (state.memberNameCache.has(userId)) return state.memberNameCache.get(userId);
+
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) return null;
+    state.memberNameCache.set(userId, data.display_name);
+    return data.display_name;
+  }
+
   function subscribeToRoom() {
     if (!supabaseClient || !state.roomId) return;
 
@@ -1717,22 +1828,28 @@
       supabaseClient.removeChannel(state.roomSubscription);
     }
 
-    state.roomSubscription = supabaseClient
+    const channel = supabaseClient
       .channel(`room-${state.roomId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "events",
+          table: state.dataMode === "pinte_finishes" ? "pinte_finishes" : "events",
           filter: `room_id=eq.${state.roomId}`
         },
-        (payload) => {
+        async (payload) => {
           if (!payload.new) return;
-          if (payload.new.type !== "finish") return;
+          if (state.dataMode === "events" && payload.new.type !== "finish") return;
 
-          const playerName = payload.new.payload?.playerName || "";
-          const normalized = playerName.trim().toLowerCase();
+          let playerName = "";
+          if (state.dataMode === "events") {
+            playerName = payload.new.payload?.playerName || "";
+          } else {
+            playerName = await fetchProfileName(payload.new.user_id);
+          }
+
+          const normalized = (playerName || "").trim().toLowerCase();
           if (!normalized) return;
 
           const joueur = state.joueurs.find((j) => j.nom.toLowerCase() === normalized);
@@ -1745,6 +1862,8 @@
         }
       )
       .subscribe();
+
+    state.roomSubscription = channel;
   }
 
   async function joinRoomAsPlayer() {
@@ -1767,20 +1886,40 @@
 
     elPlayerStatus.textContent = "Connexion à la salle...";
 
-    const { data, error } = await supabaseClient
-      .from("rooms")
-      .select("id, code")
-      .eq("code", code)
-      .single();
-
-    if (error || !data) {
-      elPlayerStatus.textContent = "Code invalide ou salle introuvable.";
+    try {
+      await ensureSignedIn();
+    } catch (error) {
+      elPlayerStatus.textContent = "Connexion Supabase impossible.";
       return;
     }
 
-    state.roomId = data.id;
-    state.roomCode = data.code;
-    elPlayerStatus.textContent = `Salle ${data.code} rejointe.`;
+    const { data: rpcData, error: rpcError } = await supabaseClient.rpc("join_room", {
+      p_code: code,
+      p_display_name: name
+    });
+
+    if (!rpcError && rpcData) {
+      state.roomId = rpcData;
+      state.roomCode = code;
+      state.dataMode = "pinte_finishes";
+      elPlayerStatus.textContent = `Salle ${code} rejointe.`;
+    } else {
+      const { data, error } = await supabaseClient
+        .from("rooms")
+        .select("id, code")
+        .eq("code", code)
+        .single();
+
+      if (error || !data) {
+        elPlayerStatus.textContent = "Code invalide ou salle introuvable.";
+        return;
+      }
+
+      state.roomId = data.id;
+      state.roomCode = data.code;
+      state.dataMode = "events";
+      elPlayerStatus.textContent = `Salle ${data.code} rejointe.`;
+    }
 
     elBtnPlayerJoin.disabled = true;
     elBtnPlayerFinish.style.display = "block";
@@ -1798,11 +1937,32 @@
       return;
     }
 
-    const { error } = await supabaseClient.from("events").insert({
-      room_id: state.roomId,
-      type: "finish",
-      payload: { playerName: name }
-    });
+    let error = null;
+
+    if (state.dataMode === "pinte_finishes") {
+      const { data: roomData } = await supabaseClient
+        .from("rooms")
+        .select("pint_no")
+        .eq("id", state.roomId)
+        .single();
+      const pintNo = roomData?.pint_no || 1;
+
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+      const { error: insertError } = await supabaseClient.from("pinte_finishes").insert({
+        room_id: state.roomId,
+        pint_no: pintNo,
+        user_id: userId
+      });
+      error = insertError;
+    } else {
+      const { error: insertError } = await supabaseClient.from("events").insert({
+        room_id: state.roomId,
+        type: "finish",
+        payload: { playerName: name }
+      });
+      error = insertError;
+    }
 
     if (error) {
       elPlayerStatus.textContent = "Erreur Supabase, réessaie.";
@@ -1999,6 +2159,16 @@
       "Tour lancé",
       "La première pinte est en cours. Appuie sur « Fini » quand un joueur termine sa pinte pour mettre à jour le Maillot Jaune."
     );
+
+    if (supabaseClient && state.roomId && state.dataMode === "pinte_finishes") {
+      supabaseClient.from("rooms").update({
+        status: "live",
+        tour_start: new Date().toISOString(),
+        duree_minutes: state.dureeMinutes,
+        difficulte: state.difficulte,
+        pint_no: state.numeroPinte
+      }).eq("id", state.roomId);
+    }
   });
 
   elBtnSettings.addEventListener("click", () => {
@@ -2060,6 +2230,37 @@
 
   elBtnPlayerFinish.addEventListener("click", () => {
     sendFinishEvent();
+  });
+
+  elBtnConfigSupabase.addEventListener("click", () => {
+    elSupabaseConfigError.textContent = "";
+    elSupabaseUrlInput.value = localStorage.getItem("supabaseUrl") || "";
+    elSupabaseKeyInput.value = localStorage.getItem("supabaseAnonKey") || "";
+    elSupabaseConfigModal.style.display = "flex";
+  });
+
+  elBtnCloseSupabase.addEventListener("click", () => {
+    elSupabaseConfigModal.style.display = "none";
+  });
+
+  elBtnSaveSupabase.addEventListener("click", () => {
+    const url = elSupabaseUrlInput.value.trim();
+    const key = elSupabaseKeyInput.value.trim();
+
+    if (!url || !key) {
+      elSupabaseConfigError.textContent = "URL et clé sont obligatoires.";
+      return;
+    }
+
+    localStorage.setItem("supabaseUrl", url);
+    localStorage.setItem("supabaseAnonKey", key);
+
+    SUPABASE_CONFIG = loadSupabaseConfig();
+    supabaseReady = isSupabaseReady(SUPABASE_CONFIG);
+    supabaseClient = supabaseReady ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey) : null;
+
+    elSupabaseConfigModal.style.display = "none";
+    location.reload();
   });
 
   const elProfilRadios = document.querySelectorAll('input[name="profil-etape"]');
