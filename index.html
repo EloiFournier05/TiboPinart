@@ -403,6 +403,49 @@
       color: var(--text-muted);
     }
 
+    .corrections-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      margin-top: 10px;
+      display: none;
+      font-size: 0.8rem;
+    }
+
+    .corrections-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr auto;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .corrections-row:last-child {
+      border-bottom: none;
+    }
+
+    .corrections-row input {
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-soft);
+      color: var(--text);
+      padding: 4px 6px;
+      font-size: 0.8rem;
+    }
+
+    .corrections-row button {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--yellow);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
     @media (max-width: 360px) {
       .player-maillots {
         flex-wrap: wrap;
@@ -521,6 +564,18 @@
       <div class="event-body">
         Quand une pinte est terminée, appuie sur « Fini » pour enregistrer le temps et mettre à jour le Maillot Jaune.
       </div>
+    </section>
+
+    <section class="corrections-card" id="corrections-card">
+      <div class="event-title" style="margin-bottom:6px;">Corrections temps (dernière étape)</div>
+      <div class="corrections-row" style="font-weight:600; color:var(--text-muted);">
+        <div>Joueur</div>
+        <div>Heure réelle</div>
+        <div>Temps dernière étape</div>
+        <div>Temps retenu (s)</div>
+        <div></div>
+      </div>
+      <div id="corrections-body"></div>
     </section>
   </div>
 
@@ -697,6 +752,7 @@
     dureeMinutes: 180,
     tourFinTimestamp: null,
     tourStartTimestamp: null,
+    stageStartTimestamp: null,
     timerInterval: null,
     pinteEnCours: true,
     finPinteOrdre: [],
@@ -710,7 +766,8 @@
     eventSubscription: null,
     dataMode: "events",
     memberNameCache: new Map(),
-    finishSignals: new Set()
+    finishSignals: new Set(),
+    lastStageIndex: 0
   };
 
   let sprintActif = false;
@@ -756,6 +813,8 @@
   const elBtnClassementClose = document.getElementById("btn-classement-close");
   const elBtnSettings = document.getElementById("btn-settings");
   const elTeamsCard = document.getElementById("teams-card");
+  const elCorrectionsCard = document.getElementById("corrections-card");
+  const elCorrectionsBody = document.getElementById("corrections-body");
 
   const elTeamsEnabled = document.getElementById("teams-enabled");
   const elTeam1Name = document.getElementById("team1-name");
@@ -812,6 +871,25 @@
     const sInt = Math.floor(abs);
     const centi = Math.round((abs - sInt) * 100);
     return `${sign}${sInt}\"${centi.toString().padStart(2, "0")}`;
+  }
+
+  function formatClockTime(timestampSeconds) {
+    if (!timestampSeconds) return "--:--";
+    const date = new Date(timestampSeconds * 1000);
+    return date.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+  }
+
+  function formatSecondsShort(seconds) {
+    if (seconds === null || seconds === undefined) return "--";
+    const s = Math.max(0, Math.round(seconds));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    if (m === 0) return `${r}s`;
+    return `${m}m ${r.toString().padStart(2, "0")}s`;
   }
 
   function nowSeconds() {
@@ -1292,6 +1370,72 @@
     });
 
     renderTeams();
+    renderCorrections();
+  }
+
+  function renderCorrections() {
+    if (!elCorrectionsCard || !elCorrectionsBody) return;
+
+    const playersWithStage = state.joueurs.filter((j) => j.lastStageNet !== undefined);
+    if (playersWithStage.length === 0) {
+      elCorrectionsCard.style.display = "none";
+      elCorrectionsBody.innerHTML = "";
+      return;
+    }
+
+    elCorrectionsCard.style.display = "block";
+    elCorrectionsBody.innerHTML = "";
+
+    playersWithStage.forEach((j) => {
+      const row = document.createElement("div");
+      row.className = "corrections-row";
+
+      const name = document.createElement("div");
+      name.textContent = j.nom;
+
+      const actual = document.createElement("div");
+      actual.textContent = formatClockTime(j.lastFinishTimestamp);
+
+      const lastStage = document.createElement("div");
+      lastStage.textContent = formatSecondsShort(j.lastStageNet);
+
+      const inputWrap = document.createElement("div");
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.step = "1";
+      input.value = Math.round(j.lastStageNet || 0);
+      input.dataset.playerId = j.id;
+      inputWrap.appendChild(input);
+
+      const btn = document.createElement("button");
+      btn.textContent = "Appliquer";
+      btn.addEventListener("click", () => {
+        const nextVal = parseFloat(input.value);
+        if (Number.isNaN(nextVal) || nextVal < 0) {
+          setEventZone("Correction", "Temps invalide.");
+          return;
+        }
+
+        const previous = j.lastStageNet || 0;
+        const diff = nextVal - previous;
+        j.lastStageNet = nextVal;
+        j.tempsCumulé += diff;
+        renderPlayers();
+        setEventZone(
+          "Correction appliquée",
+          `Temps ajusté pour ${j.nom}: ${formatSecondsShort(previous)} → ${formatSecondsShort(nextVal)}.`
+        );
+      });
+
+      row.appendChild(name);
+      row.appendChild(actual);
+      row.appendChild(lastStage);
+      row.appendChild(inputWrap);
+      row.appendChild(btn);
+
+      elCorrectionsBody.appendChild(row);
+    });
   }
 
   function renderTeams() {
@@ -1404,6 +1548,7 @@
 
     const t = nowSeconds();
     joueur.aFiniCettePinte = true;
+    joueur.lastFinishTimestamp = t;
     state.finPinteOrdre.push({ joueurId, timestamp: t });
 
     setEventZone(
@@ -1438,6 +1583,8 @@
       if (net < 0) net = 0;
 
       joueur.tempsCumulé += net;
+      joueur.lastStageNet = net;
+      joueur.lastStageRaw = brut;
 
       const rang = idx + 1;
       const deltaStr = formatDeltaSeconds(brut);
@@ -1453,6 +1600,7 @@
     });
 
     state.numeroPinte += 1;
+    state.lastStageIndex += 1;
     cleanExpiredIncidents();
 
     renderPlayers();
@@ -2251,9 +2399,12 @@
     state.dureeMinutes = minutes;
     state.tourStartTimestamp = nowSeconds();
     state.tourFinTimestamp = state.tourStartTimestamp + minutes * 60;
+    state.stageStartTimestamp = state.tourStartTimestamp;
     state.pinteEnCours = true;
     state.finPinteOrdre = [];
     state.numeroPinte = 1;
+    state.lastStageIndex = 0;
+    state.finishSignals.clear();
 
     const occ = computeOccurrences(state.dureeMinutes, state.difficulte);
     state.timelineEvents = buildTimeline(state.dureeMinutes, occ);
