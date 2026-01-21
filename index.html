@@ -397,6 +397,25 @@
       margin-top: 14px;
     }
 
+    .player-white-btn {
+      width: 100%;
+      border-radius: 16px;
+      padding: 16px 12px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      background: var(--white-maillot);
+      color: #000;
+      border: none;
+      cursor: pointer;
+      margin-top: 12px;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+    }
+
+    .player-white-btn:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+
     .player-status {
       margin-top: 10px;
       font-size: 0.85rem;
@@ -714,7 +733,10 @@
       </div>
       <button id="btn-player-join" class="btn-primary">Rejoindre la salle</button>
       <div class="player-status" id="player-status"></div>
+      <div class="player-status" id="player-white-status"></div>
       <button id="btn-player-finish" class="player-finish" style="display:none;">J’ai fini ma pinte</button>
+      <button id="btn-player-ready" class="player-white-btn" style="display:none;">Je suis prêt</button>
+      <button id="btn-player-white-click" class="player-white-btn" style="display:none;">CLIQUE !</button>
     </div>
   </div>
 </div>
@@ -767,7 +789,23 @@
     dataMode: "events",
     memberNameCache: new Map(),
     finishSignals: new Set(),
-    lastStageIndex: 0
+    lastStageIndex: 0,
+    whiteEvent: {
+      state: "WHITE_NONE",
+      pintNo: null,
+      readySet: new Set(),
+      clickSet: new Set(),
+      clickLog: [],
+      countdownTimer: null,
+      countdownRemaining: null,
+      participants: []
+    },
+    playerWhite: {
+      ready: false,
+      clicked: false,
+      countdownTimer: null,
+      countdownRemaining: null
+    }
   };
 
   let sprintActif = false;
@@ -777,8 +815,16 @@
   let coteActive = false;
   let coteCible = null;
 
-  let echappeeActive = false;
-  let echappeeClics = [];
+  const WHITE_STATES = {
+    NONE: "WHITE_NONE",
+    ARMING: "WHITE_ARMING",
+    ARMED: "WHITE_ARMED",
+    COUNTDOWN: "WHITE_COUNTDOWN",
+    RUNNING: "WHITE_RUNNING",
+    DONE: "WHITE_DONE"
+  };
+
+  const WHITE_COUNTDOWN_SECONDS = 5;
 
   let incidentActif = false;
   let incidentData = null;
@@ -842,6 +888,9 @@
   const elBtnPlayerJoin = document.getElementById("btn-player-join");
   const elBtnPlayerFinish = document.getElementById("btn-player-finish");
   const elPlayerStatus = document.getElementById("player-status");
+  const elPlayerWhiteStatus = document.getElementById("player-white-status");
+  const elBtnPlayerReady = document.getElementById("btn-player-ready");
+  const elBtnPlayerWhiteClick = document.getElementById("btn-player-white-click");
 
   const elSupabaseConfigModal = document.getElementById("supabase-config-modal");
   const elSupabaseUrlInput = document.getElementById("supabase-url-input");
@@ -922,6 +971,14 @@
     if (bodyEl) bodyEl.textContent = body;
   }
 
+  function setDefaultEventZone() {
+    if ([WHITE_STATES.ARMING, WHITE_STATES.ARMED].includes(state.whiteEvent.state)) {
+      updateHostWhiteStatus();
+      return;
+    }
+    setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini ».");
+  }
+
   function showSupabaseError(message) {
     if (elSupabaseStatus) {
       elSupabaseStatus.textContent = message;
@@ -930,8 +987,16 @@
     setEventZone("Supabase", message);
   }
 
+  function normalizePlayerName(name) {
+    return (name || "").trim().toLowerCase();
+  }
+
+  function findPlayerByNormalized(normalized) {
+    return state.joueurs.find((j) => normalizePlayerName(j.nom) === normalized);
+  }
+
   function getFinishKey(name) {
-    return `${state.numeroPinte}:${(name || "").trim().toLowerCase()}`;
+    return `${state.numeroPinte}:${normalizePlayerName(name)}`;
   }
 
   function recordFinish(name) {
@@ -1113,7 +1178,7 @@
   }
 
   function isAnyEventActive() {
-    return sprintActif || coteActive || echappeeActive || incidentActif;
+    return sprintActif || coteActive || incidentActif || isWhiteBusy();
   }
 
   function checkTimelineEvents() {
@@ -1147,11 +1212,8 @@
             playSound("COTE");
           }
         } else if (ev.type === "ECHAPPEE") {
-          if (!echappeeActive) {
-            echappeeActive = true;
-            echappeeClics = [];
-            renderEchappeeInterface();
-            playSound("ECHAPPEE");
+          if (state.whiteEvent.state === WHITE_STATES.NONE || state.whiteEvent.state === WHITE_STATES.DONE) {
+            armWhiteEvent();
           }
         } else if (ev.type === "INCIDENT") {
           if (!incidentActif) {
@@ -1606,6 +1668,7 @@
     renderPlayers();
 
     setEventZone("Étape terminée", resumeEtape.trim());
+    handleWhiteStageEnd(state.numeroPinte - 1);
 
     if (supabaseClient && state.roomId && state.dataMode === "pinte_finishes") {
       supabaseClient.from("rooms").update({
@@ -1762,66 +1825,294 @@
     document.getElementById("event-zone").innerHTML = html;
 
     document.getElementById("btn-cote-ok").addEventListener("click", () => {
-      setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini »." );
+      setDefaultEventZone();
     });
   }
 
-  function renderEchappeeInterface() {
-    const html = [];
+  function resetWhiteEvent() {
+    if (state.whiteEvent.countdownTimer) {
+      clearInterval(state.whiteEvent.countdownTimer);
+    }
+    state.whiteEvent.state = WHITE_STATES.NONE;
+    state.whiteEvent.pintNo = null;
+    state.whiteEvent.readySet = new Set();
+    state.whiteEvent.clickSet = new Set();
+    state.whiteEvent.clickLog = [];
+    state.whiteEvent.countdownTimer = null;
+    state.whiteEvent.countdownRemaining = null;
+    state.whiteEvent.participants = [];
+  }
 
-    html.push('<div class="event-title">🚴 Échappée</div>');
-    html.push('<div class="event-body">Le plus rapide gagne ! Touchez votre bouton dès qu\'il apparaît :</div>');
-
-    html.push('<div style="margin-top:12px;">');
-
-    state.joueurs.forEach((j) => {
-      html.push(`
-        <button id="echappee-${j.id}" class="btn-primary" style="width:100%; margin-bottom:8px; background:#ffffff; color:#000;">
-          ${j.nom}
-        </button>
-      `);
+  function getWhiteReadySummary() {
+    const readyNames = [];
+    state.whiteEvent.readySet.forEach((normalized) => {
+      const player = state.joueurs.find((j) => normalizePlayerName(j.nom) === normalized);
+      if (player) readyNames.push(player.nom);
     });
+    const total = state.joueurs.length;
+    return {
+      count: readyNames.length,
+      total,
+      list: readyNames
+    };
+  }
 
-    html.push("</div>");
+  function updateHostWhiteStatus(extraMessage) {
+    const readySummary = getWhiteReadySummary();
+    const header = "🚴 Échappée armée";
+    const base = "Elle se jouera à la fin de l’étape.";
+    const readyLine = `Prêts : ${readySummary.count}/${readySummary.total}`;
+    const listLine = readySummary.list.length > 0 ? `Prêts : ${readySummary.list.join(", ")}` : "Aucun prêt pour l’instant.";
+    const body = [base, readyLine, listLine, extraMessage].filter(Boolean).join("\n");
+    setEventZone(header, body);
+  }
 
-    document.getElementById("event-zone").innerHTML = html.join("");
-
-    state.joueurs.forEach((j) => {
-      document.getElementById(`echappee-${j.id}`).addEventListener("click", () => {
-        handleEchappeeClick(j.id);
-      });
+  async function sendRoomEvent(type, payload) {
+    if (!supabaseClient || !state.roomId) return;
+    try {
+      await ensureSignedIn();
+    } catch (error) {
+      return;
+    }
+    await supabaseClient.from("events").insert({
+      room_id: state.roomId,
+      type,
+      payload
     });
   }
 
-  function handleEchappeeClick(joueurId) {
-    if (!echappeeActive) return;
-
-    echappeeClics.push({
-      id: joueurId,
-      t: nowSeconds()
-    });
-
-    if (echappeeClics.length === state.joueurs.length) {
-      finalizeEchappee();
+  function resetPlayerWhiteState() {
+    if (state.playerWhite.countdownTimer) {
+      clearInterval(state.playerWhite.countdownTimer);
+    }
+    state.playerWhite.ready = false;
+    state.playerWhite.clicked = false;
+    state.playerWhite.countdownTimer = null;
+    state.playerWhite.countdownRemaining = null;
+    if (elBtnPlayerReady) {
+      elBtnPlayerReady.style.display = "none";
+      elBtnPlayerReady.disabled = false;
+      elBtnPlayerReady.textContent = "Je suis prêt";
+    }
+    if (elBtnPlayerWhiteClick) {
+      elBtnPlayerWhiteClick.style.display = "none";
+      elBtnPlayerWhiteClick.disabled = true;
+    }
+    if (elPlayerWhiteStatus) {
+      elPlayerWhiteStatus.textContent = "";
     }
   }
 
-  function finalizeEchappee() {
-    echappeeActive = false;
+  function updatePlayerWhiteStatus(message) {
+    if (elPlayerWhiteStatus) {
+      elPlayerWhiteStatus.textContent = message || "";
+    }
+  }
 
-    echappeeClics.sort((a, b) => a.t - b.t);
+  function updatePlayerWhiteButtons() {
+    if (!elBtnPlayerReady || !elBtnPlayerWhiteClick) return;
 
+    if (state.whiteEvent.state === WHITE_STATES.ARMING || state.whiteEvent.state === WHITE_STATES.ARMED) {
+      elBtnPlayerReady.style.display = "block";
+      elBtnPlayerReady.disabled = state.playerWhite.ready;
+      elBtnPlayerReady.textContent = state.playerWhite.ready ? "Prêt ✅" : "Je suis prêt";
+      elBtnPlayerWhiteClick.style.display = "none";
+    } else if (state.whiteEvent.state === WHITE_STATES.COUNTDOWN) {
+      elBtnPlayerReady.style.display = "none";
+      if (state.playerWhite.ready) {
+        elBtnPlayerWhiteClick.style.display = "block";
+        elBtnPlayerWhiteClick.disabled = true;
+      } else {
+        elBtnPlayerWhiteClick.style.display = "none";
+      }
+    } else if (state.whiteEvent.state === WHITE_STATES.RUNNING) {
+      elBtnPlayerReady.style.display = "none";
+      if (state.playerWhite.ready) {
+        elBtnPlayerWhiteClick.style.display = "block";
+        elBtnPlayerWhiteClick.disabled = state.playerWhite.clicked;
+      } else {
+        elBtnPlayerWhiteClick.style.display = "none";
+      }
+    } else {
+      elBtnPlayerReady.style.display = "none";
+      elBtnPlayerWhiteClick.style.display = "none";
+    }
+  }
+
+  function startPlayerWhiteCountdown(startsInSec) {
+    state.whiteEvent.state = WHITE_STATES.COUNTDOWN;
+    state.playerWhite.countdownRemaining = startsInSec;
+    updatePlayerWhiteStatus(`Départ dans ${state.playerWhite.countdownRemaining}…`);
+    updatePlayerWhiteButtons();
+
+    if (state.playerWhite.countdownTimer) {
+      clearInterval(state.playerWhite.countdownTimer);
+    }
+
+    state.playerWhite.countdownTimer = setInterval(() => {
+      state.playerWhite.countdownRemaining -= 1;
+      const remaining = Math.max(0, state.playerWhite.countdownRemaining);
+      updatePlayerWhiteStatus(`Départ dans ${remaining}…`);
+      if (remaining <= 0) {
+        clearInterval(state.playerWhite.countdownTimer);
+        state.playerWhite.countdownTimer = null;
+        state.whiteEvent.state = WHITE_STATES.RUNNING;
+        updatePlayerWhiteStatus(state.playerWhite.ready ? "CLIQUE !" : "Tu n'es pas prêt, tu ne participes pas.");
+        updatePlayerWhiteButtons();
+      }
+    }, 1000);
+  }
+
+  async function armWhiteEvent() {
+    if (state.whiteEvent.state !== WHITE_STATES.NONE && state.whiteEvent.state !== WHITE_STATES.DONE) {
+      updateHostWhiteStatus("Une échappée est déjà armée.");
+      return;
+    }
+
+    resetWhiteEvent();
+    state.whiteEvent.state = WHITE_STATES.ARMING;
+    state.whiteEvent.pintNo = state.numeroPinte;
+    state.whiteEvent.readySet = new Set();
+    state.whiteEvent.clickSet = new Set();
+    state.whiteEvent.clickLog = [];
+    state.whiteEvent.participants = [];
+
+    updateHostWhiteStatus("Les joueurs peuvent se déclarer prêts.");
+    playSound("ECHAPPEE");
+
+    await sendRoomEvent("white_armed", { pint_no: state.whiteEvent.pintNo });
+  }
+
+  function isWhiteBusy() {
+    return state.whiteEvent.state === WHITE_STATES.COUNTDOWN || state.whiteEvent.state === WHITE_STATES.RUNNING;
+  }
+
+  function handleWhiteReady(playerName, pintNo) {
+    if (!state.whiteEvent.pintNo || pintNo !== state.whiteEvent.pintNo) return;
+    if (![WHITE_STATES.ARMING, WHITE_STATES.ARMED].includes(state.whiteEvent.state)) return;
+
+    const normalized = normalizePlayerName(playerName);
+    if (!normalized) return;
+    if (!findPlayerByNormalized(normalized)) return;
+    if (state.whiteEvent.readySet.has(normalized)) return;
+
+    state.whiteEvent.readySet.add(normalized);
+
+    if (state.whiteEvent.readySet.size === state.joueurs.length) {
+      state.whiteEvent.state = WHITE_STATES.ARMED;
+      updateHostWhiteStatus("Tous les joueurs sont prêts.");
+    } else {
+      updateHostWhiteStatus();
+    }
+  }
+
+  function handleWhiteStageEnd(pintNo) {
+    if (![WHITE_STATES.ARMING, WHITE_STATES.ARMED].includes(state.whiteEvent.state)) return;
+    if (!state.whiteEvent.pintNo || state.whiteEvent.pintNo !== pintNo) return;
+
+    state.whiteEvent.state = WHITE_STATES.COUNTDOWN;
+    state.whiteEvent.participants = Array.from(state.whiteEvent.readySet);
+
+    const pintNo = state.whiteEvent.pintNo;
+    sendRoomEvent("white_start", { pint_no: pintNo, startsInSec: WHITE_COUNTDOWN_SECONDS });
+
+    state.whiteEvent.countdownRemaining = WHITE_COUNTDOWN_SECONDS;
+    updateWhiteCountdownUI();
+
+    if (state.whiteEvent.countdownTimer) {
+      clearInterval(state.whiteEvent.countdownTimer);
+    }
+    state.whiteEvent.countdownTimer = setInterval(() => {
+      state.whiteEvent.countdownRemaining -= 1;
+      updateWhiteCountdownUI();
+      if (state.whiteEvent.countdownRemaining <= 0) {
+        clearInterval(state.whiteEvent.countdownTimer);
+        state.whiteEvent.countdownTimer = null;
+        startWhiteRunning();
+      }
+    }, 1000);
+  }
+
+  function updateWhiteCountdownUI() {
+    const readySummary = getWhiteReadySummary();
+    const remaining = Math.max(0, state.whiteEvent.countdownRemaining || 0);
+    setEventZone(
+      "⚪ Départ échappée",
+      `Départ dans ${remaining}…\nPrêts : ${readySummary.count}/${readySummary.total}`
+    );
+  }
+
+  function startWhiteRunning() {
+    state.whiteEvent.state = WHITE_STATES.RUNNING;
+    if (state.whiteEvent.participants.length === 0) {
+      finalizeWhiteEvent([]);
+      return;
+    }
+
+    const participants = state.whiteEvent.participants
+      .map((name) => {
+        const player = state.joueurs.find((j) => normalizePlayerName(j.nom) === name);
+        return player ? player.nom : name;
+      })
+      .join(", ");
+
+    setEventZone(
+      "⚪ White Stage",
+      `Cliquez sur vos téléphones !\nParticipants : ${participants || "—"}`
+    );
+  }
+
+  function handleWhiteClick(playerName, pintNo) {
+    if (state.whiteEvent.state !== WHITE_STATES.RUNNING) return;
+    if (!state.whiteEvent.pintNo || pintNo !== state.whiteEvent.pintNo) return;
+
+    const normalized = normalizePlayerName(playerName);
+    if (!normalized) return;
+    if (!state.whiteEvent.participants.includes(normalized)) return;
+    if (state.whiteEvent.clickSet.has(normalized)) return;
+
+    state.whiteEvent.clickSet.add(normalized);
+    state.whiteEvent.clickLog.push({ name: normalized, t: nowSeconds() });
+
+    if (state.whiteEvent.clickSet.size >= state.whiteEvent.participants.length) {
+      finalizeWhiteEvent(state.whiteEvent.clickLog);
+    } else {
+      const remaining = state.whiteEvent.participants.length - state.whiteEvent.clickSet.size;
+      setEventZone("⚪ White Stage", `Clics reçus. En attente de ${remaining} joueur(s)…`);
+    }
+  }
+
+  function finalizeWhiteEvent(clickLog) {
+    state.whiteEvent.state = WHITE_STATES.DONE;
     const points = [3, 1];
-    let recap = "Résultats de l'échappée :\n\n";
+    const sorted = [...clickLog].sort((a, b) => a.t - b.t);
 
-    echappeeClics.forEach((entry, idx) => {
-      const joueur = state.joueurs.find((j) => j.id === entry.id);
+    let recap = "Résultats de l'échappée :\n\n";
+    const ranking = [];
+
+    sorted.forEach((entry, idx) => {
+      const player = state.joueurs.find((j) => normalizePlayerName(j.nom) === entry.name);
       const p = points[idx] || 0;
-      joueur.pointsBlanc += p;
-      recap += `${idx + 1}. ${joueur.nom} (+${p} pts)\n`;
+      if (player && p > 0) {
+        player.pointsBlanc += p;
+      }
+      if (player) {
+        recap += `${idx + 1}. ${player.nom} (+${p} pts)\n`;
+        ranking.push({ name: player.nom, points: p });
+      }
     });
 
+    if (sorted.length === 0) {
+      recap += "Personne n'était prêt. Aucun point attribué.\n";
+    }
+
     renderPlayers();
+
+    sendRoomEvent("white_results", {
+      pint_no: state.whiteEvent.pintNo,
+      ranking,
+      points
+    });
 
     const html = `
       <div class="event-title">Échappée terminée</div>
@@ -1835,7 +2126,8 @@
     document.getElementById("event-zone").innerHTML = html;
 
     document.getElementById("btn-echappee-ok").addEventListener("click", () => {
-      setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini »." );
+      resetWhiteEvent();
+      setDefaultEventZone();
     });
   }
 
@@ -1898,7 +2190,7 @@
       incidentActif = false;
       incidentData = null;
 
-      setEventZone("Aucun événement en cours", "Quand une pinte est terminée, appuie sur « Fini ».");
+      setDefaultEventZone();
     });
   }
 
@@ -2022,6 +2314,40 @@
     return data.display_name;
   }
 
+  function handleFinishSignal(playerName) {
+    const normalized = normalizePlayerName(playerName);
+    if (!normalized) return;
+
+    if (!recordFinish(normalized)) return;
+
+    const joueur = findPlayerByNormalized(normalized);
+    if (!joueur) {
+      setEventZone("Signal joueur inconnu", `${playerName} n'existe pas dans la liste.`);
+      return;
+    }
+
+    handlePlayerFinish(joueur.id);
+  }
+
+  function handleHostRoomEvent(event) {
+    if (!event) return;
+    const type = event.type;
+    const payload = event.payload || {};
+    const pintNo = payload.pint_no;
+
+    if (type === "finish") {
+      handleFinishSignal(payload.playerName || "");
+    }
+
+    if (type === "white_ready") {
+      handleWhiteReady(payload.playerName || "", pintNo);
+    }
+
+    if (type === "white_click") {
+      handleWhiteClick(payload.playerName || "", pintNo);
+    }
+  }
+
   function subscribeToRoom() {
     if (!supabaseClient || !state.roomId) return;
 
@@ -2044,27 +2370,14 @@
         },
         async (payload) => {
           if (!payload.new) return;
-          if (state.dataMode === "events" && payload.new.type !== "finish") return;
-
-          let playerName = "";
           if (state.dataMode === "events") {
-            playerName = payload.new.payload?.playerName || "";
-          } else {
-            playerName = await fetchProfileName(payload.new.user_id);
-          }
-
-          const normalized = (playerName || "").trim().toLowerCase();
-          if (!normalized) return;
-
-          if (!recordFinish(normalized)) return;
-
-          const joueur = state.joueurs.find((j) => j.nom.toLowerCase() === normalized);
-          if (!joueur) {
-            setEventZone("Signal joueur inconnu", `${playerName} n'existe pas dans la liste.`);
+            handleHostRoomEvent(payload.new);
             return;
           }
 
-          handlePlayerFinish(joueur.id);
+          const playerName = await fetchProfileName(payload.new.user_id);
+          if (!playerName) return;
+          handleFinishSignal(playerName);
         }
       )
       .subscribe();
@@ -2083,23 +2396,82 @@
             filter: `room_id=eq.${state.roomId}`
           },
           (payload) => {
-            if (!payload.new || payload.new.type !== "finish") return;
-            const playerName = payload.new.payload?.playerName || "";
-            const normalized = playerName.trim().toLowerCase();
-            if (!normalized) return;
-            if (!recordFinish(normalized)) return;
-            const joueur = state.joueurs.find((j) => j.nom.toLowerCase() === normalized);
-            if (!joueur) {
-              setEventZone("Signal joueur inconnu", `${playerName} n'existe pas dans la liste.`);
-              return;
-            }
-            handlePlayerFinish(joueur.id);
+            if (!payload.new) return;
+            handleHostRoomEvent(payload.new);
           }
         )
         .subscribe();
 
       state.eventSubscription = eventChannel;
     }
+  }
+
+  function handlePlayerRoomEvent(event) {
+    if (!event) return;
+    const type = event.type;
+    const payload = event.payload || {};
+    const pintNo = payload.pint_no;
+
+    if (type === "white_armed") {
+      resetPlayerWhiteState();
+      state.whiteEvent.state = WHITE_STATES.ARMING;
+      state.whiteEvent.pintNo = pintNo;
+      updatePlayerWhiteStatus("Échappée armée : appuie sur « Je suis prêt ».");
+      updatePlayerWhiteButtons();
+    }
+
+    if (type === "white_start") {
+      if (!state.whiteEvent.pintNo || state.whiteEvent.pintNo !== pintNo) {
+        state.whiteEvent.pintNo = pintNo;
+      }
+      const startsInSec = payload.startsInSec || WHITE_COUNTDOWN_SECONDS;
+      startPlayerWhiteCountdown(startsInSec);
+    }
+
+    if (type === "white_results") {
+      if (state.whiteEvent.pintNo && pintNo !== state.whiteEvent.pintNo) return;
+      state.whiteEvent.state = WHITE_STATES.DONE;
+      const ranking = payload.ranking || [];
+      if (ranking.length === 0) {
+        updatePlayerWhiteStatus("Échappée terminée. Aucun point attribué.");
+      } else {
+        const lines = ranking.map((entry, idx) => `${idx + 1}. ${entry.name} (+${entry.points} pts)`);
+        updatePlayerWhiteStatus(`Échappée terminée : ${lines.join(" · ")}`);
+      }
+      updatePlayerWhiteButtons();
+      setTimeout(() => {
+        resetPlayerWhiteState();
+        state.whiteEvent.state = WHITE_STATES.NONE;
+        state.whiteEvent.pintNo = null;
+      }, 4000);
+    }
+  }
+
+  function subscribeToPlayerEvents() {
+    if (!supabaseClient || !state.roomId) return;
+
+    if (state.eventSubscription) {
+      supabaseClient.removeChannel(state.eventSubscription);
+    }
+
+    const channel = supabaseClient
+      .channel(`player-events-${state.roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "events",
+          filter: `room_id=eq.${state.roomId}`
+        },
+        (payload) => {
+          if (!payload.new) return;
+          handlePlayerRoomEvent(payload.new);
+        }
+      )
+      .subscribe();
+
+    state.eventSubscription = channel;
   }
 
   async function joinRoomAsPlayer() {
@@ -2159,6 +2531,7 @@
 
     elBtnPlayerJoin.disabled = true;
     elBtnPlayerFinish.style.display = "block";
+    subscribeToPlayerEvents();
   }
 
   async function sendFinishEvent() {
@@ -2236,6 +2609,43 @@
     }, 8000);
   }
 
+  async function sendWhiteReadyEvent() {
+    if (!supabaseClient || !state.roomId) return;
+    if (!state.whiteEvent.pintNo) return;
+    if (![WHITE_STATES.ARMING, WHITE_STATES.ARMED].includes(state.whiteEvent.state)) return;
+    if (state.playerWhite.ready) return;
+
+    const name = elPlayerName.value.trim();
+    if (!name) {
+      updatePlayerWhiteStatus("Merci de saisir ton prénom.");
+      return;
+    }
+
+    await sendRoomEvent("white_ready", { playerName: name, pint_no: state.whiteEvent.pintNo });
+    state.playerWhite.ready = true;
+    updatePlayerWhiteStatus("Prêt ✅ En attente du départ…");
+    updatePlayerWhiteButtons();
+  }
+
+  async function sendWhiteClickEvent() {
+    if (!supabaseClient || !state.roomId) return;
+    if (!state.whiteEvent.pintNo) return;
+    if (!state.playerWhite.ready) return;
+    if (state.playerWhite.clicked) return;
+    if (state.whiteEvent.state !== WHITE_STATES.RUNNING) return;
+
+    const name = elPlayerName.value.trim();
+    if (!name) {
+      updatePlayerWhiteStatus("Merci de saisir ton prénom.");
+      return;
+    }
+
+    await sendRoomEvent("white_click", { playerName: name, pint_no: state.whiteEvent.pintNo });
+    state.playerWhite.clicked = true;
+    updatePlayerWhiteStatus("Clique enregistré ✅");
+    updatePlayerWhiteButtons();
+  }
+
   document.getElementById("btn-sprint").addEventListener("click", () => {
     if (sprintActif) {
       setEventZone("Sprint impossible", "Un sprint est déjà en cours !");
@@ -2286,15 +2696,12 @@
   });
 
   document.getElementById("btn-echappee").addEventListener("click", () => {
-    if (echappeeActive) {
-      setEventZone("Échappée impossible", "Une échappée est déjà en cours !");
+    if (state.whiteEvent.state !== WHITE_STATES.NONE && state.whiteEvent.state !== WHITE_STATES.DONE) {
+      setEventZone("Échappée impossible", "Une échappée est déjà armée ou en cours.");
       return;
     }
 
-    echappeeActive = true;
-    echappeeClics = [];
-
-    renderEchappeeInterface();
+    armWhiteEvent();
   });
 
   document.getElementById("btn-incident").addEventListener("click", () => {
@@ -2410,6 +2817,7 @@
     state.numeroPinte = 1;
     state.lastStageIndex = 0;
     state.finishSignals.clear();
+    resetWhiteEvent();
 
     const occ = computeOccurrences(state.dureeMinutes, state.difficulte);
     state.timelineEvents = buildTimeline(state.dureeMinutes, occ);
@@ -2484,6 +2892,7 @@
 
     elMainContent.style.display = "none";
     elPlayerContent.style.display = "block";
+    resetPlayerWhiteState();
 
     if (!supabaseReady) {
       elPlayerStatus.textContent = "Supabase non configuré. Mode Player indisponible.";
@@ -2498,6 +2907,18 @@
   elBtnPlayerFinish.addEventListener("click", () => {
     sendFinishEvent();
   });
+
+  if (elBtnPlayerReady) {
+    elBtnPlayerReady.addEventListener("click", () => {
+      sendWhiteReadyEvent();
+    });
+  }
+
+  if (elBtnPlayerWhiteClick) {
+    elBtnPlayerWhiteClick.addEventListener("click", () => {
+      sendWhiteClickEvent();
+    });
+  }
 
   elBtnConfigSupabase.addEventListener("click", () => {
     elSupabaseConfigError.textContent = "";
