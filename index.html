@@ -1994,11 +1994,16 @@
         elPlayerStatus.textContent = "Session invalide. Rejoins la salle à nouveau.";
         return;
       }
-      const { error: insertError } = await supabaseClient.from("pinte_finishes").insert({
-        room_id: state.roomId,
-        pint_no: pintNo,
-        user_id: userId
-      });
+      const { error: insertError } = await supabaseClient
+        .from("pinte_finishes")
+        .upsert(
+          {
+            room_id: state.roomId,
+            pint_no: pintNo,
+            user_id: userId
+          },
+          { onConflict: "room_id,pint_no,user_id", ignoreDuplicates: true }
+        );
       error = insertError;
     } else {
       const { error: insertError } = await supabaseClient.from("events").insert({
