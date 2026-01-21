@@ -1740,7 +1740,12 @@
   async function createRoom() {
     if (!supabaseClient) return null;
 
-    await ensureSignedIn();
+    try {
+      await ensureSignedIn();
+    } catch (error) {
+      setEventZone("Supabase", "Connexion impossible. Vérifiez l'URL et la clé anon.");
+      return null;
+    }
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const code = generateRoomCode(6);
@@ -1755,6 +1760,14 @@
       if (!rpcError && rpcData) {
         state.dataMode = "pinte_finishes";
         return { id: rpcData, code };
+      }
+
+      if (rpcError) {
+        setEventZone(
+          "Supabase",
+          `Erreur RPC create_room: ${rpcError.message || "inconnue"}. Vérifiez vos policies/auth.`
+        );
+        return null;
       }
 
       const { data, error } = await supabaseClient
@@ -1787,15 +1800,14 @@
 
     elSupabaseWarning.style.display = "none";
     let room = null;
-    try {
-      room = await createRoom();
-    } catch (error) {
-      setEventZone("Supabase", "Connexion impossible. Vérifiez votre URL/clé.");
-    }
+    room = await createRoom();
 
     if (!room) {
       updateRoomCodeUI("ERR");
-      setEventZone("Supabase", "Impossible de créer la salle. Les joueurs ne pourront pas rejoindre.");
+      setEventZone(
+        "Supabase",
+        "Impossible de créer la salle. Vérifiez l'URL/clé, les policies RLS et que l'auth anonyme est activée."
+      );
       return;
     }
 
