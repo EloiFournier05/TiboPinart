@@ -2013,8 +2013,8 @@
     state.whiteEvent.state = WHITE_STATES.COUNTDOWN;
     state.whiteEvent.participants = Array.from(state.whiteEvent.readySet);
 
-    const pintNo = state.whiteEvent.pintNo;
-    sendRoomEvent("white_start", { pint_no: pintNo, startsInSec: WHITE_COUNTDOWN_SECONDS });
+    const currentPintNo = state.whiteEvent.pintNo;
+    sendRoomEvent("white_start", { pint_no: currentPintNo, startsInSec: WHITE_COUNTDOWN_SECONDS });
 
     state.whiteEvent.countdownRemaining = WHITE_COUNTDOWN_SECONDS;
     updateWhiteCountdownUI();
